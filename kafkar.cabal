@@ -1,0 +1,38 @@
+name:                kafkar
+version:             0.1.0.0
+-- synopsis:
+-- description:
+license:             BSD2
+license-file:        LICENSE
+author:              Alex Sayers
+maintainer:          alex.sayers@gmail.com
+-- copyright:
+category:            System
+build-type:          Simple
+-- extra-source-files:
+cabal-version:       >=1.10
+
+library
+  exposed-modules:
+      Database.Kafkar
+  build-depends:       base >=4.8 && <4.9
+                     , attoparsec
+                     , attoparsec-binary
+                     , bytestring
+                     , directory >= 1.2.5
+                     , filepath
+                     , hashable
+                     , pipes
+                     , pipes-attoparsec
+                     , pipes-bytestring
+                     , pipes-safe >= 2.2
+                     , snappy
+                     , text
+                     , transformers
+                     , unordered-containers
+                     , vector
+                     , vector-space
+                     , zlib
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+  ghc-options:         -Wall

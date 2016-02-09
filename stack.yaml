@@ -1,0 +1,10 @@
+flags: {}
+extra-package-dbs: []
+packages:
+- '.'
+extra-deps:
+- attoparsec-binary-0.2
+- directory-1.2.5.0
+- snappy-0.2.0.2
+- vector-0.11.0.0
+resolver: lts-3.14
