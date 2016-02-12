@@ -3,6 +3,10 @@
 module Database.Kafkar.Parsers
     ( parseMessageEntry
     , parseIndex
+
+    , kafkaBytes
+    , kafkaString
+    , kafkaArray
     ) where
 
 import Control.Monad
