@@ -127,11 +127,6 @@ import Database.Kafkar.Types
 import Database.Kafkar.Util
 
 
--- | Just for testing in GHCi
-_loadTopic :: String -> IO Topic
-_loadTopic topicName =
-    loadTopic "/var/lib/kafka" topicName 0
-
 -- | Create a handle for a topic/partition stored on the filesystem.
 --
 -- This function will read all index files for the given topic into memory
