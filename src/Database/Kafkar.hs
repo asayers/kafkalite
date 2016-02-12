@@ -154,8 +154,10 @@ loadTopic logDir topicName partition = do
 -- | Load an index file completely into memory and parse it.
 loadIndex :: FilePath -> IO Index
 loadIndex idxPath =
-    either (error "loadIndex: TODO") id . AP.parseOnly parseIndex <$>
+    either (error err) id . AP.parseOnly parseIndex <$>
       BS.readFile idxPath
+  where
+    err = "loadIndex: error parsing the index file " ++ idxPath
 
 -- | Stream messages from the given topic, starting at the given offset.
 --

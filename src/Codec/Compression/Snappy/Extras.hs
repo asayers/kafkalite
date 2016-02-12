@@ -29,7 +29,9 @@ data FramingFormat
 decompress' :: (Monad m) => ByteString -> Producer ByteString m ()
 decompress' bs = do
     AP.Done remainder header <- pure $ AP.parse parseHeader bs
-    either (error "") id <$> parsed (parseBlock header) (yield remainder)
+    either (error err) id <$> parsed (parseBlock header) (yield remainder)
+  where
+    err = "Codec.Compression.Snappy.Extras.decompress': parse error"
 
 -- | Parse the header which tells us what framing format we're using.
 parseHeader :: Parser FramingFormat
