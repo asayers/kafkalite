@@ -76,7 +76,9 @@
 --
 -- == Other caveats
 --
--- - Kafka only flushes its logs to disk periodically.
+-- - Kafka only flushes its logs to disk periodically. This means that new
+--   messages in a topic will be absent from the on-disk logs for some
+--   amount of time.
 --
 module Database.Kafkar
     ( -- * Core API
