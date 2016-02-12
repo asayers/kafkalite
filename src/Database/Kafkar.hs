@@ -83,7 +83,7 @@
 module Database.Kafkar
     ( -- * Core API
       loadTopic   -- :: FilePath -> String -> Int -> IO Topic
-    , readTopic   -- :: Topic -> Offset -> Producer MessageEntry IO ()
+    , readTopic   -- :: MonadSafe m => Topic -> Offset -> Producer MessageEntry m ()
 
       -- * Types
     , MessageEntry(..)

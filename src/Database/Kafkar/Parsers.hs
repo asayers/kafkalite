@@ -38,7 +38,7 @@ parseMessage = do
     guard $ magic == 0    -- We only support version 0
     attributes <- parseAttributes
     key <- kafkaBytes
-    value <- kafkaBytes
+    value <- kafkaBytes   -- TODO: make sure these are being evaluated strictly
     return Message{..}
 
 -- This byte holds metadata attributes about the message. The lowest 2 bits
@@ -47,7 +47,7 @@ parseMessage = do
 parseAttributes :: Parser Attributes
 parseAttributes = do
     attrs <- AP.anyInt8
-    compression <- case attrs .&. 0x3 of  -- lower 2 bits
+    compression <- case attrs .&. 0x3 of  -- mask all but the lower 2 bits
           0 -> return None
           1 -> return GZip
           2 -> return Snappy
