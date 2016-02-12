@@ -1,5 +1,4 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE Rank2Types #-}
 
 -- | Read-only support for the Kafka on-disk format, no broker required!
 --
