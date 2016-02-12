@@ -30,13 +30,13 @@ library
   hs-source-dirs:      src
   exposed-modules:
       Database.Kafkar
-      Database.Kafkar.Types
   other-modules:
       Codec.Compression.GZip.Extras
       Codec.Compression.Snappy.Extras
       Data.Attoparsec.ByteString.Extras
       Database.Kafkar.Compression
       Database.Kafkar.Parsers
+      Database.Kafkar.Types
       Database.Kafkar.Util
   build-depends:
         base >=4.8 && <4.9

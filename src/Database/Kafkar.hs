@@ -227,9 +227,10 @@ readFileFromOffset path offset =
 lookupPosition
     :: Offset   -- ^ The target message
     -> Topic    -- ^ The topic
-    -> ( VB.Vector FilePath  -- ^ Paths of the relevant log files
-       , LogPosition         -- ^
-       , RelativeOffset)
+    -> ( VB.Vector FilePath  --- ^ Paths of the relevant log files
+       , LogPosition         --- ^ Starting position within the first file
+       , RelativeOffset      --- ^ Number of messages to skip after seeking
+       )
 lookupPosition targetOffset Topic{..} =
     let relevantSegments =
           dropUntilLast ((<= targetOffset) . initialOffset) segments
