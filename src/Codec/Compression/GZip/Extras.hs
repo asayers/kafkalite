@@ -5,8 +5,10 @@ module Codec.Compression.GZip.Extras
     ) where
 
 import Codec.Compression.GZip as GZip
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString      as BS
+import Pipes
+import qualified Pipes.ByteString as P
 
-decompress' :: BS.ByteString -> BS.ByteString
-decompress' = BL.toStrict . GZip.decompress . BL.fromStrict
+decompress' :: (Monad m) => ByteString -> Producer ByteString m ()
+decompress' = P.fromLazy . GZip.decompress . BL.fromStrict

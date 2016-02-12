@@ -16,7 +16,7 @@ module Database.Kafkar.Compression
     ) where
 
 import qualified Codec.Compression.GZip.Extras as G
-import qualified Codec.Compression.Snappy as S
+import qualified Codec.Compression.Snappy.Extras as S
 import Data.ByteString (ByteString)
 import Data.Maybe
 import Pipes
@@ -38,15 +38,15 @@ decompressMsg
 decompressMsg entry =
     case compression (attributes $ message entry) of
         None   -> yield entry
-        GZIP   -> decompressStream $ decompressMsgWith G.decompress' entry
-        Snappy -> decompressStream $ decompressMsgWith S.decompress  entry
+        GZip   -> decompressStream $ decompressMsgWith G.decompress' entry
+        Snappy -> decompressStream $ decompressMsgWith S.decompress' entry
 
 -- | Given a message which is wrapping a compressed collection of messages,
 -- decompress the value using the provided function, then parse the result
 -- as a sequence of messages and yield them as a Producer.
 decompressMsgWith
     :: (Monad m)
-    => (ByteString -> ByteString)    -- ^ Decompression function
+    => (ByteString -> Producer ByteString m ())    -- ^ Decompression function
     -> MessageEntry                  -- ^ Message wrapping compressed data
     -> Producer MessageEntry m ()    --   Inner messages
 decompressMsgWith decompress =
@@ -57,4 +57,4 @@ decompressMsgWith decompress =
     errIfParseFail =
       either (error "decompressMsg: parse error") id
     parseMessages =
-      PAP.parsed parseMessageEntry . yield
+      PAP.parsed parseMessageEntry

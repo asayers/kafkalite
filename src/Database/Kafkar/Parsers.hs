@@ -7,12 +7,10 @@ module Database.Kafkar.Parsers
 
 import Control.Monad
 import Data.Attoparsec.ByteString (Parser)
-import qualified Data.Attoparsec.ByteString as AP
-import qualified Data.Attoparsec.Binary as AP
+import qualified Data.Attoparsec.ByteString.Extras as AP
 import Data.Bits
 import Data.ByteString (ByteString)
-import Data.Int
-import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as V
 
 import Database.Kafkar.Types
 
@@ -22,8 +20,8 @@ import Database.Kafkar.Types
 
 parseMessageEntry :: Parser MessageEntry
 parseMessageEntry = do
-    offset <- Offset <$> anyInt64be
-    size <- fromIntegral <$> anyInt32be
+    offset <- Offset <$> AP.anyInt64be
+    size <- fromIntegral <$> AP.anyInt32be
     message <- parseMessage
     return MessageEntry{..}
 
@@ -35,12 +33,12 @@ parseMessageEntry = do
 --   Value => bytes
 parseMessage :: Parser Message
 parseMessage = do
-    _crc <- anyInt32be  -- TODO: check crc
-    magic <- anyInt8
+    _crc <- AP.anyInt32be  -- TODO: check crc
+    magic <- AP.anyInt8
     guard $ magic == 0    -- We only support version 0
     attributes <- parseAttributes
-    key <- anyBytes
-    value <- anyBytes
+    key <- kafkaBytes
+    value <- kafkaBytes
     return Message{..}
 
 -- This byte holds metadata attributes about the message. The lowest 2 bits
@@ -48,10 +46,10 @@ parseMessage = do
 -- should be set to 0.
 parseAttributes :: Parser Attributes
 parseAttributes = do
-    attrs <- anyInt8
+    attrs <- AP.anyInt8
     compression <- case attrs .&. 0x3 of  -- lower 2 bits
           0 -> return None
-          1 -> return GZIP
+          1 -> return GZip
           2 -> return Snappy
           _ -> fail "Unknown codec"
     return Attributes{..}
@@ -65,13 +63,13 @@ parseIndex =
 
 parseIndexEntry :: Parser IndexEntry
 parseIndexEntry = do
-    relativeOffset <- RelativeOffset <$> anyInt32be
-    logPosition <- LogPosition <$> anyInt32be
+    relativeOffset <- RelativeOffset <$> AP.anyInt32be
+    logPosition <- LogPosition <$> AP.anyInt32be
     guard $ relativeOffset /= RelativeOffset 0  -- Otherwise we're at the end
     return IndexEntry{..}
 
 -------------------------------------------------------------------------------
--- Protocol Primitive Types
+-- Kafka protocol primitive types
 
 -- The protocol is built out of the following primitive types.
 --
@@ -87,42 +85,26 @@ parseIndexEntry = do
 --   up of other primitive types. In the BNF grammars below we will show an
 --   array of a structure foo as [foo].
 
-{-# INLINE anyInt8 #-}
-anyInt8 :: Parser Int8
-anyInt8 = fromIntegral <$> AP.anyWord8
-
-{-# INLINE anyInt16be #-}
-anyInt16be :: Parser Int16
-anyInt16be = fromIntegral <$> AP.anyWord16be
-
-{-# INLINE anyInt32be #-}
-anyInt32be :: Parser Int32
-anyInt32be = fromIntegral <$> AP.anyWord32be
-
-{-# INLINE anyInt64be #-}
-anyInt64be :: Parser Int64
-anyInt64be = fromIntegral <$> AP.anyWord64be
-
-{-# INLINE anyBytes #-}
-anyBytes :: Parser (Maybe ByteString)
-anyBytes = do
-    len <- anyInt32be
+{-# INLINE kafkaBytes #-}
+kafkaBytes :: Parser (Maybe ByteString)
+kafkaBytes = do
+    len <- AP.anyInt32be
     if len == -1
       then return Nothing
       else Just <$> AP.take (fromIntegral len)
 
-{-# INLINE anyString #-}
-anyString :: Parser (Maybe ByteString)
-anyString = do
-    len <- anyInt16be
+{-# INLINE kafkaString #-}
+kafkaString :: Parser (Maybe ByteString)
+kafkaString = do
+    len <- AP.anyInt16be
     if len == -1
       then return Nothing
       else Just <$> AP.take (fromIntegral len)
 
-{-# INLINE anyArray #-}
-anyArray :: Parser a -> Parser [a]
-anyArray inner = do
-    len <- anyInt32be
+{-# INLINE kafkaArray #-}
+kafkaArray :: Parser a -> Parser [a]
+kafkaArray inner = do
+    len <- AP.anyInt32be
     replicateM (fromIntegral len) inner
 
 -- References:

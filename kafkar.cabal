@@ -1,38 +1,58 @@
 name:                kafkar
 version:             0.1.0.0
--- synopsis:
--- description:
 license:             BSD2
 license-file:        LICENSE
-author:              Alex Sayers
-maintainer:          alex.sayers@gmail.com
--- copyright:
-category:            System
-build-type:          Simple
--- extra-source-files:
+author:              Alex Sayers <alex.sayers@gmail.com>
+maintainer:          Alex Sayers <alex.sayers@gmail.com>
+copyright:           (c) Alex Sayers 2016
+homepage:            https://github.com/asayers/kafkar
+bug-Reports:         https://github.com/asayers/kafkar/issues
+category:            Database
+synopsis:            Read-only support for the Kafka on-disk format
+description:
+        .
+        Consume your Kafka streams without spinning up the JVM!
+        .
+        This package is designed to address the case where you have a bunch of
+        Kafka streams stored on a local disk, and want to consume them without
+        having to start a Kafka instance. It presents a read-only streaming
+        interface to your kafka streams, and handles efficient seeking and
+        decompression.
+
 cabal-version:       >=1.10
+build-type:          Simple
+extra-source-files:
+    README.md
 
 library
-  exposed-modules:
-      Database.Kafkar
-  build-depends:       base >=4.8 && <4.9
-                     , attoparsec
-                     , attoparsec-binary
-                     , bytestring
-                     , directory >= 1.2.5
-                     , filepath
-                     , hashable
-                     , pipes
-                     , pipes-attoparsec
-                     , pipes-bytestring
-                     , pipes-safe >= 2.2
-                     , snappy
-                     , text
-                     , transformers
-                     , unordered-containers
-                     , vector
-                     , vector-space
-                     , zlib
-  hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -Wall
+  hs-source-dirs:      src
+  exposed-modules:
+      Database.Kafkar
+      Database.Kafkar.Types
+  other-modules:
+      Codec.Compression.GZip.Extras
+      Codec.Compression.Snappy.Extras
+      Data.Attoparsec.ByteString.Extras
+      Database.Kafkar.Compression
+      Database.Kafkar.Parsers
+      Database.Kafkar.Util
+  build-depends:
+        base >=4.8 && <4.9
+      , attoparsec
+      , attoparsec-binary
+      , bytestring
+      , directory >= 1.2.5
+      , filepath
+      , hashable
+      , pipes
+      , pipes-attoparsec
+      , pipes-bytestring
+      , pipes-safe >= 2.2
+      , snappy
+      , transformers
+      , vector
+      , vector-space
+      , vector-th-unbox
+      , zlib
