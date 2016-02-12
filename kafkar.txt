@@ -9,8 +9,12 @@
 --   This package is designed to address the case where you have a bunch of
 --   Kafka streams stored on a local disk, and want to consume them without
 --   having to start a Kafka instance. It presents a read-only streaming
---   interface to your kafka streams, and handles efficient seeking and
---   decompression.
+--   interface to your kafka topics, and handles efficient seeking and
+--   decompression. Note that new messages may take a while to show in the
+--   log files.
+--   
+--   This package also contains an example program, which simply streams
+--   kafka topics to stdout.
 @package kafkar
 @version 0.1.0.0
 
@@ -95,7 +99,9 @@
 --   <h2>Other caveats</h2>
 --   
 --   <ul>
---   <li>Kafka only flushes its logs to disk periodically.</li>
+--   <li>Kafka only flushes its logs to disk periodically. This means that
+--   new messages in a topic will be absent from the on-disk logs for some
+--   amount of time.</li>
 --   </ul>
 module Database.Kafkar
 

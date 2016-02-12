@@ -85,205 +85,207 @@
 <a name="line-76"></a><span class='hs-comment'>--</span>
 <a name="line-77"></a><span class='hs-comment'>-- == Other caveats</span>
 <a name="line-78"></a><span class='hs-comment'>--</span>
-<a name="line-79"></a><span class='hs-comment'>-- - Kafka only flushes its logs to disk periodically.</span>
-<a name="line-80"></a><span class='hs-comment'>--</span>
-<a name="line-81"></a><span class='hs-keyword'>module</span> <span class='hs-conid'>Database</span><span class='hs-varop'>.</span><span class='hs-conid'>Kafkar</span>
-<a name="line-82"></a>    <span class='hs-layout'>(</span> <span class='hs-comment'>-- * Core API</span>
-<a name="line-83"></a>      <span class='hs-varid'>loadTopic</span>   <span class='hs-comment'>-- :: FilePath -&gt; String -&gt; Int -&gt; IO Topic</span>
-<a name="line-84"></a>    <span class='hs-layout'>,</span> <span class='hs-varid'>readTopic</span>   <span class='hs-comment'>-- :: Topic -&gt; Offset -&gt; Producer MessageEntry IO ()</span>
-<a name="line-85"></a>
-<a name="line-86"></a>      <span class='hs-comment'>-- * Types</span>
-<a name="line-87"></a>    <span class='hs-layout'>,</span> <span class='hs-conid'>MessageEntry</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
-<a name="line-88"></a>    <span class='hs-layout'>,</span> <span class='hs-conid'>Message</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
-<a name="line-89"></a>    <span class='hs-layout'>,</span> <span class='hs-conid'>Attributes</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
-<a name="line-90"></a>    <span class='hs-layout'>,</span> <span class='hs-conid'>Codec</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
-<a name="line-91"></a>    <span class='hs-layout'>,</span> <span class='hs-conid'>Offset</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
-<a name="line-92"></a>
-<a name="line-93"></a>      <span class='hs-comment'>-- * Pretty-printing</span>
-<a name="line-94"></a>    <span class='hs-layout'>,</span> <span class='hs-varid'>ppMessage</span>   <span class='hs-comment'>-- :: MessageEntry -&gt; String</span>
-<a name="line-95"></a>    <span class='hs-layout'>)</span> <span class='hs-keyword'>where</span>
-<a name="line-96"></a>
-<a name="line-97"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Control</span><span class='hs-varop'>.</span><span class='hs-conid'>Exception</span> <span class='hs-layout'>(</span><span class='hs-varid'>throwIO</span><span class='hs-layout'>)</span>
-<a name="line-98"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Control</span><span class='hs-varop'>.</span><span class='hs-conid'>Monad</span>
-<a name="line-99"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Control</span><span class='hs-varop'>.</span><span class='hs-conid'>Monad</span><span class='hs-varop'>.</span><span class='hs-conid'>IO</span><span class='hs-varop'>.</span><span class='hs-conid'>Class</span>
-<a name="line-100"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>AffineSpace</span>
-<a name="line-101"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>AdditiveGroup</span>
-<a name="line-102"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Attoparsec</span><span class='hs-varop'>.</span><span class='hs-conid'>ByteString</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>AP</span>
-<a name="line-103"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>ByteString</span> <span class='hs-layout'>(</span><span class='hs-conid'>ByteString</span><span class='hs-layout'>)</span>
-<a name="line-104"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>ByteString</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>BS</span>
-<a name="line-105"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Function</span>
-<a name="line-106"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>List</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>L</span>
-<a name="line-107"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Maybe</span>
-<a name="line-108"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Monoid</span>
-<a name="line-109"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Traversable</span>
-<a name="line-110"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Vector</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>VB</span>
-<a name="line-111"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Pipes</span> <span class='hs-varid'>hiding</span> <span class='hs-layout'>(</span><span class='hs-varid'>for</span><span class='hs-layout'>)</span>
-<a name="line-112"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Pipes</span><span class='hs-varop'>.</span><span class='hs-conid'>Safe</span>
-<a name="line-113"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Pipes</span><span class='hs-varop'>.</span><span class='hs-conid'>Prelude</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>P</span>
-<a name="line-114"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Pipes</span><span class='hs-varop'>.</span><span class='hs-conid'>Safe</span><span class='hs-varop'>.</span><span class='hs-conid'>Prelude</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>P</span>
-<a name="line-115"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Pipes</span><span class='hs-varop'>.</span><span class='hs-conid'>Attoparsec</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>PAP</span>
-<a name="line-116"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Pipes</span><span class='hs-varop'>.</span><span class='hs-conid'>ByteString</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>PBS</span>
-<a name="line-117"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>System</span><span class='hs-varop'>.</span><span class='hs-conid'>Directory</span>
-<a name="line-118"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>System</span><span class='hs-varop'>.</span><span class='hs-conid'>Exit</span>
-<a name="line-119"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>System</span><span class='hs-varop'>.</span><span class='hs-conid'>FilePath</span>
-<a name="line-120"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>System</span><span class='hs-varop'>.</span><span class='hs-conid'>IO</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>IO</span>
-<a name="line-121"></a>
-<a name="line-122"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Database</span><span class='hs-varop'>.</span><span class='hs-conid'>Kafkar</span><span class='hs-varop'>.</span><span class='hs-conid'>Compression</span>
-<a name="line-123"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Database</span><span class='hs-varop'>.</span><span class='hs-conid'>Kafkar</span><span class='hs-varop'>.</span><span class='hs-conid'>Parsers</span>
-<a name="line-124"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Database</span><span class='hs-varop'>.</span><span class='hs-conid'>Kafkar</span><span class='hs-varop'>.</span><span class='hs-conid'>Types</span>
-<a name="line-125"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Database</span><span class='hs-varop'>.</span><span class='hs-conid'>Kafkar</span><span class='hs-varop'>.</span><span class='hs-conid'>Util</span>
-<a name="line-126"></a>
-<a name="line-127"></a>
-<a name="line-128"></a><span class='hs-comment'>-- | Just for testing in GHCi</span>
-<a name="line-129"></a><span class='hs-sel'>_loadTopic</span> <span class='hs-keyglyph'>::</span> <span class='hs-conid'>String</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>IO</span> <span class='hs-conid'>Topic</span>
-<a name="line-130"></a><span class='hs-sel'>_loadTopic</span> <span class='hs-varid'>topicName</span> <span class='hs-keyglyph'>=</span>
-<a name="line-131"></a>    <span class='hs-varid'>loadTopic</span> <span class='hs-str'>"/var/lib/kafka"</span> <span class='hs-varid'>topicName</span> <span class='hs-num'>0</span>
-<a name="line-132"></a>
-<a name="line-133"></a><a name="loadTopic"></a><span class='hs-comment'>-- | Create a handle for a topic/partition stored on the filesystem.</span>
-<a name="line-134"></a><span class='hs-comment'>--</span>
-<a name="line-135"></a><span class='hs-comment'>-- This function will read all index files for the given topic into memory</span>
-<a name="line-136"></a><span class='hs-comment'>-- (~10KB per segment). It will not read any log data. The returned value</span>
-<a name="line-137"></a><span class='hs-comment'>-- should not contain any thunks.</span>
-<a name="line-138"></a><span class='hs-definition'>loadTopic</span>
-<a name="line-139"></a>    <span class='hs-keyglyph'>::</span> <span class='hs-conid'>FilePath</span>  <span class='hs-comment'>-- ^ Kafka log directory (eg. \/var\/lib\/kafka)</span>
-<a name="line-140"></a>    <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>String</span>    <span class='hs-comment'>-- ^ Topic name</span>
-<a name="line-141"></a>    <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Int</span>       <span class='hs-comment'>-- ^ Partition number</span>
-<a name="line-142"></a>    <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>IO</span> <span class='hs-conid'>Topic</span>
-<a name="line-143"></a><span class='hs-definition'>loadTopic</span> <span class='hs-varid'>logDir</span> <span class='hs-varid'>topicName</span> <span class='hs-varid'>partition</span> <span class='hs-keyglyph'>=</span> <span class='hs-keyword'>do</span>
-<a name="line-144"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>topicDir</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>logDir</span> <span class='hs-varop'>&lt;/&gt;</span> <span class='hs-varid'>topicName</span> <span class='hs-varop'>++</span> <span class='hs-str'>"-"</span> <span class='hs-varop'>++</span> <span class='hs-varid'>show</span> <span class='hs-varid'>partition</span>
-<a name="line-145"></a>    <span class='hs-varid'>listing</span> <span class='hs-keyglyph'>&lt;-</span> <span class='hs-varid'>map</span> <span class='hs-layout'>(</span><span class='hs-varid'>topicDir</span> <span class='hs-varop'>&lt;/&gt;</span><span class='hs-layout'>)</span> <span class='hs-varop'>&lt;$&gt;</span> <span class='hs-varid'>listDirectory</span> <span class='hs-varid'>topicDir</span>
-<a name="line-146"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>logs</span>    <span class='hs-keyglyph'>=</span> <span class='hs-conid'>L</span><span class='hs-varop'>.</span><span class='hs-varid'>sort</span> <span class='hs-varop'>$</span> <span class='hs-varid'>filter</span> <span class='hs-layout'>(</span><span class='hs-str'>".log"</span>   <span class='hs-varop'>`</span><span class='hs-conid'>L</span><span class='hs-varop'>.</span><span class='hs-varid'>isSuffixOf</span><span class='hs-varop'>`</span><span class='hs-layout'>)</span> <span class='hs-varid'>listing</span>
-<a name="line-147"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>indices</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>L</span><span class='hs-varop'>.</span><span class='hs-varid'>sort</span> <span class='hs-varop'>$</span> <span class='hs-varid'>filter</span> <span class='hs-layout'>(</span><span class='hs-str'>".index"</span> <span class='hs-varop'>`</span><span class='hs-conid'>L</span><span class='hs-varop'>.</span><span class='hs-varid'>isSuffixOf</span><span class='hs-varop'>`</span><span class='hs-layout'>)</span> <span class='hs-varid'>listing</span>
-<a name="line-148"></a>    <span class='hs-varid'>rawSegments</span> <span class='hs-keyglyph'>&lt;-</span> <span class='hs-varid'>for</span> <span class='hs-layout'>(</span><span class='hs-varid'>zip</span> <span class='hs-varid'>logs</span> <span class='hs-varid'>indices</span><span class='hs-layout'>)</span> <span class='hs-varop'>$</span> <span class='hs-keyglyph'>\</span><span class='hs-layout'>(</span><span class='hs-varid'>logPath</span><span class='hs-layout'>,</span> <span class='hs-varid'>idxPath</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-keyword'>do</span>
-<a name="line-149"></a>        <span class='hs-keyword'>let</span> <span class='hs-varid'>logOffset</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>Offset</span> <span class='hs-varop'>$</span> <span class='hs-varid'>read</span> <span class='hs-varop'>$</span> <span class='hs-varid'>dropExtension</span> <span class='hs-varop'>$</span> <span class='hs-varid'>takeFileName</span> <span class='hs-varid'>logPath</span>
-<a name="line-150"></a>        <span class='hs-keyword'>let</span> <span class='hs-varid'>idxOffset</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>Offset</span> <span class='hs-varop'>$</span> <span class='hs-varid'>read</span> <span class='hs-varop'>$</span> <span class='hs-varid'>dropExtension</span> <span class='hs-varop'>$</span> <span class='hs-varid'>takeFileName</span> <span class='hs-varid'>idxPath</span>
-<a name="line-151"></a>        <span class='hs-varid'>unless</span> <span class='hs-layout'>(</span><span class='hs-varid'>logOffset</span> <span class='hs-varop'>==</span> <span class='hs-varid'>idxOffset</span><span class='hs-layout'>)</span> <span class='hs-varid'>exitFailure</span>
-<a name="line-152"></a>        <span class='hs-varid'>index</span> <span class='hs-keyglyph'>&lt;-</span> <span class='hs-varid'>loadIndex</span> <span class='hs-varid'>idxPath</span>
-<a name="line-153"></a>        <span class='hs-varid'>return</span> <span class='hs-varop'>$!</span> <span class='hs-conid'>Segment</span><span class='hs-layout'>{</span><span class='hs-varid'>initialOffset</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>logOffset</span><span class='hs-layout'>,</span> <span class='hs-keyglyph'>..</span><span class='hs-layout'>}</span>
-<a name="line-154"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>segments</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>VB</span><span class='hs-varop'>.</span><span class='hs-varid'>fromList</span> <span class='hs-varop'>$</span> <span class='hs-conid'>L</span><span class='hs-varop'>.</span><span class='hs-varid'>sortBy</span> <span class='hs-layout'>(</span><span class='hs-varid'>compare</span> <span class='hs-varop'>`on`</span> <span class='hs-varid'>initialOffset</span><span class='hs-layout'>)</span> <span class='hs-varid'>rawSegments</span>
-<a name="line-155"></a>    <span class='hs-varid'>return</span> <span class='hs-conid'>Topic</span><span class='hs-layout'>{</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>}</span>
-<a name="line-156"></a>
-<a name="line-157"></a><a name="loadIndex"></a><span class='hs-comment'>-- | Load an index file completely into memory and parse it.</span>
-<a name="line-158"></a><span class='hs-definition'>loadIndex</span> <span class='hs-keyglyph'>::</span> <span class='hs-conid'>FilePath</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>IO</span> <span class='hs-conid'>Index</span>
-<a name="line-159"></a><span class='hs-definition'>loadIndex</span> <span class='hs-varid'>idxPath</span> <span class='hs-keyglyph'>=</span>
-<a name="line-160"></a>    <span class='hs-varid'>either</span> <span class='hs-layout'>(</span><span class='hs-varid'>error</span> <span class='hs-str'>"loadIndex: TODO"</span><span class='hs-layout'>)</span> <span class='hs-varid'>id</span> <span class='hs-varop'>.</span> <span class='hs-conid'>AP</span><span class='hs-varop'>.</span><span class='hs-varid'>parseOnly</span> <span class='hs-varid'>parseIndex</span> <span class='hs-varop'>&lt;$&gt;</span>
-<a name="line-161"></a>      <span class='hs-conid'>BS</span><span class='hs-varop'>.</span><span class='hs-varid'>readFile</span> <span class='hs-varid'>idxPath</span>
-<a name="line-162"></a>
-<a name="line-163"></a><a name="readTopic"></a><span class='hs-comment'>-- | Stream messages from the given topic, starting at the given offset.</span>
-<a name="line-164"></a><span class='hs-comment'>--</span>
-<a name="line-165"></a><span class='hs-comment'>-- This function uses the Kafka index to perform an efficient seek to the</span>
-<a name="line-166"></a><span class='hs-comment'>-- desired offset. Given that the index is in memory, a seek should require</span>
-<a name="line-167"></a><span class='hs-comment'>-- reading a bounded number of bytes (determined by the density of the</span>
-<a name="line-168"></a><span class='hs-comment'>-- index).</span>
-<a name="line-169"></a><span class='hs-comment'>--</span>
-<a name="line-170"></a><span class='hs-comment'>-- It then streams messages from the log file, parsing and decompressing</span>
-<a name="line-171"></a><span class='hs-comment'>-- them. The `compression` attribute should always be `None` for messages</span>
-<a name="line-172"></a><span class='hs-comment'>-- returned by this function.</span>
-<a name="line-173"></a><span class='hs-comment'>--</span>
-<a name="line-174"></a><span class='hs-comment'>-- Kafka logs are stored in multiple segments. This function should only</span>
-<a name="line-175"></a><span class='hs-comment'>-- hold a read handle for one segment file at a time.</span>
-<a name="line-176"></a><span class='hs-definition'>readTopic</span>
-<a name="line-177"></a>    <span class='hs-keyglyph'>::</span> <span class='hs-layout'>(</span><span class='hs-conid'>MonadSafe</span> <span class='hs-varid'>m</span><span class='hs-layout'>)</span>
-<a name="line-178"></a>    <span class='hs-keyglyph'>=&gt;</span> <span class='hs-conid'>Topic</span>      <span class='hs-comment'>-- ^ Topic handle to read from</span>
-<a name="line-179"></a>    <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Offset</span>     <span class='hs-comment'>-- ^ Offset to begin reading at, given as a number of</span>
-<a name="line-180"></a>                  <span class='hs-comment'>--   messages since the start of the topic.</span>
-<a name="line-181"></a>    <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Producer</span> <span class='hs-conid'>MessageEntry</span> <span class='hs-varid'>m</span> <span class='hs-conid'>()</span>
-<a name="line-182"></a><span class='hs-definition'>readTopic</span> <span class='hs-varid'>topic</span> <span class='hs-varid'>targetOffset</span> <span class='hs-keyglyph'>=</span> <span class='hs-keyword'>do</span>
-<a name="line-183"></a>    <span class='hs-keyword'>let</span> <span class='hs-layout'>(</span><span class='hs-varid'>logFiles</span><span class='hs-layout'>,</span> <span class='hs-varid'>startPos</span><span class='hs-layout'>,</span> <span class='hs-varid'>remainingMsgs</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>lookupPosition</span> <span class='hs-varid'>targetOffset</span> <span class='hs-varid'>topic</span>
-<a name="line-184"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>positions</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>startPos</span> <span class='hs-conop'>:</span> <span class='hs-varid'>repeat</span> <span class='hs-layout'>(</span><span class='hs-conid'>LogPosition</span> <span class='hs-num'>0</span><span class='hs-layout'>)</span>
-<a name="line-185"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>msgsFromStartPos</span> <span class='hs-keyglyph'>=</span>
-<a name="line-186"></a>          <span class='hs-varid'>mapM_</span> <span class='hs-layout'>(</span><span class='hs-varid'>uncurry</span> <span class='hs-varid'>readLog</span><span class='hs-layout'>)</span> <span class='hs-layout'>(</span><span class='hs-varid'>zip</span> <span class='hs-layout'>(</span><span class='hs-conid'>VB</span><span class='hs-varop'>.</span><span class='hs-varid'>toList</span> <span class='hs-varid'>logFiles</span><span class='hs-layout'>)</span> <span class='hs-varid'>positions</span><span class='hs-layout'>)</span>
-<a name="line-187"></a>    <span class='hs-varid'>msgsFromStartPos</span> <span class='hs-varop'>&gt;-&gt;</span> <span class='hs-varid'>dropMessages</span> <span class='hs-varid'>remainingMsgs</span>
-<a name="line-188"></a>
-<a name="line-189"></a><a name="dropMessages"></a><span class='hs-definition'>dropMessages</span> <span class='hs-keyglyph'>::</span> <span class='hs-layout'>(</span><span class='hs-conid'>Monad</span> <span class='hs-varid'>m</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=&gt;</span> <span class='hs-conid'>RelativeOffset</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Pipe</span> <span class='hs-conid'>MessageEntry</span> <span class='hs-conid'>MessageEntry</span> <span class='hs-varid'>m</span> <span class='hs-conid'>()</span>
-<a name="line-190"></a><span class='hs-definition'>dropMessages</span> <span class='hs-layout'>(</span><span class='hs-conid'>RelativeOffset</span> <span class='hs-varid'>offset</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>P</span><span class='hs-varop'>.</span><span class='hs-varid'>drop</span> <span class='hs-layout'>(</span><span class='hs-varid'>fromIntegral</span> <span class='hs-varid'>offset</span><span class='hs-layout'>)</span>
-<a name="line-191"></a>
-<a name="line-192"></a><a name="readLog"></a><span class='hs-comment'>-- | Read the given log file from the specified byte offset, and parse the</span>
-<a name="line-193"></a><span class='hs-comment'>-- result as a sequence of `Message`s. Parse errors are raised as</span>
-<a name="line-194"></a><span class='hs-comment'>-- exceptions. If the given offset doesn't correspond to a message</span>
-<a name="line-195"></a><span class='hs-comment'>-- boundary, this will (likely) cause a parse error.</span>
-<a name="line-196"></a><span class='hs-comment'>--</span>
-<a name="line-197"></a><span class='hs-comment'>-- The resulting messages have `compression = None`, and their offsets are</span>
-<a name="line-198"></a><span class='hs-comment'>-- sequential and dense.</span>
-<a name="line-199"></a><span class='hs-definition'>readLog</span>
-<a name="line-200"></a>    <span class='hs-keyglyph'>::</span> <span class='hs-layout'>(</span><span class='hs-conid'>MonadSafe</span> <span class='hs-varid'>m</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=&gt;</span> <span class='hs-conid'>FilePath</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>LogPosition</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Producer</span> <span class='hs-conid'>MessageEntry</span> <span class='hs-varid'>m</span> <span class='hs-conid'>()</span>
-<a name="line-201"></a><span class='hs-definition'>readLog</span> <span class='hs-varid'>path</span> <span class='hs-varid'>offset</span> <span class='hs-keyglyph'>=</span>
-<a name="line-202"></a>    <span class='hs-varid'>decompressStream</span> <span class='hs-varop'>$</span> <span class='hs-varid'>readLogCompressed</span> <span class='hs-varid'>path</span> <span class='hs-varid'>offset</span>
-<a name="line-203"></a>
-<a name="line-204"></a><a name="readLogCompressed"></a><span class='hs-comment'>-- The resulting message may have a mix of compression attributes, and</span>
-<a name="line-205"></a><span class='hs-comment'>-- their offsets are in-order but not dense. The offset of a compressed</span>
-<a name="line-206"></a><span class='hs-comment'>-- message indicates the offset of the *last* message stored in its value</span>
-<a name="line-207"></a><span class='hs-comment'>-- field.</span>
-<a name="line-208"></a><span class='hs-definition'>readLogCompressed</span>
-<a name="line-209"></a>    <span class='hs-keyglyph'>::</span> <span class='hs-layout'>(</span><span class='hs-conid'>MonadSafe</span> <span class='hs-varid'>m</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=&gt;</span> <span class='hs-conid'>FilePath</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>LogPosition</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Producer</span> <span class='hs-conid'>MessageEntry</span> <span class='hs-varid'>m</span> <span class='hs-conid'>()</span>
-<a name="line-210"></a><span class='hs-definition'>readLogCompressed</span> <span class='hs-varid'>path</span> <span class='hs-layout'>(</span><span class='hs-conid'>LogPosition</span> <span class='hs-varid'>offset</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=</span> <span class='hs-keyword'>do</span>
-<a name="line-211"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>rawData</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>readFileFromOffset</span> <span class='hs-varid'>path</span> <span class='hs-layout'>(</span><span class='hs-varid'>fromIntegral</span> <span class='hs-varid'>offset</span><span class='hs-layout'>)</span>
-<a name="line-212"></a>    <span class='hs-varid'>ret</span> <span class='hs-keyglyph'>&lt;-</span> <span class='hs-conid'>PAP</span><span class='hs-varop'>.</span><span class='hs-varid'>parsed</span> <span class='hs-varid'>parseMessageEntry</span> <span class='hs-varid'>rawData</span>
-<a name="line-213"></a>    <span class='hs-varid'>liftIO</span> <span class='hs-varop'>$</span> <span class='hs-varid'>either</span> <span class='hs-layout'>(</span><span class='hs-varid'>throwIO</span> <span class='hs-varop'>.</span> <span class='hs-varid'>fst</span><span class='hs-layout'>)</span> <span class='hs-varid'>return</span> <span class='hs-varid'>ret</span>
-<a name="line-214"></a>
-<a name="line-215"></a><a name="readFileFromOffset"></a><span class='hs-comment'>-- | Read the given file from the specified byte offset.</span>
-<a name="line-216"></a><span class='hs-definition'>readFileFromOffset</span>
-<a name="line-217"></a>    <span class='hs-keyglyph'>::</span> <span class='hs-layout'>(</span><span class='hs-conid'>MonadSafe</span> <span class='hs-varid'>m</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=&gt;</span> <span class='hs-conid'>FilePath</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Int</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Producer</span> <span class='hs-conid'>ByteString</span> <span class='hs-varid'>m</span> <span class='hs-conid'>()</span>
-<a name="line-218"></a><span class='hs-definition'>readFileFromOffset</span> <span class='hs-varid'>path</span> <span class='hs-varid'>offset</span> <span class='hs-keyglyph'>=</span>
-<a name="line-219"></a>    <span class='hs-conid'>P</span><span class='hs-varop'>.</span><span class='hs-varid'>withFile</span> <span class='hs-varid'>path</span> <span class='hs-conid'>IO</span><span class='hs-varop'>.</span><span class='hs-conid'>ReadMode</span> <span class='hs-varop'>$</span> <span class='hs-keyglyph'>\</span><span class='hs-varid'>h</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-keyword'>do</span>
-<a name="line-220"></a>      <span class='hs-varid'>liftIO</span> <span class='hs-varop'>$</span> <span class='hs-conid'>IO</span><span class='hs-varop'>.</span><span class='hs-varid'>hSeek</span> <span class='hs-varid'>h</span> <span class='hs-conid'>IO</span><span class='hs-varop'>.</span><span class='hs-conid'>AbsoluteSeek</span> <span class='hs-layout'>(</span><span class='hs-varid'>fromIntegral</span> <span class='hs-varid'>offset</span><span class='hs-layout'>)</span>
-<a name="line-221"></a>      <span class='hs-conid'>PBS</span><span class='hs-varop'>.</span><span class='hs-varid'>fromHandle</span> <span class='hs-varid'>h</span>
-<a name="line-222"></a>
-<a name="line-223"></a><span class='hs-comment'>-------------------------------------------------------------------------------</span>
-<a name="line-224"></a><span class='hs-comment'>-- Reading the index</span>
-<a name="line-225"></a>
-<a name="line-226"></a><a name="lookupPosition"></a><span class='hs-comment'>-- | TODO</span>
-<a name="line-227"></a><span class='hs-definition'>lookupPosition</span>
-<a name="line-228"></a>    <span class='hs-keyglyph'>::</span> <span class='hs-conid'>Offset</span>   <span class='hs-comment'>-- ^ The target message</span>
-<a name="line-229"></a>    <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Topic</span>    <span class='hs-comment'>-- ^ The topic</span>
-<a name="line-230"></a>    <span class='hs-keyglyph'>-&gt;</span> <span class='hs-layout'>(</span> <span class='hs-conid'>VB</span><span class='hs-varop'>.</span><span class='hs-conid'>Vector</span> <span class='hs-conid'>FilePath</span>  <span class='hs-comment'>--- ^ Paths of the relevant log files</span>
-<a name="line-231"></a>       <span class='hs-layout'>,</span> <span class='hs-conid'>LogPosition</span>         <span class='hs-comment'>--- ^ Starting position within the first file</span>
-<a name="line-232"></a>       <span class='hs-layout'>,</span> <span class='hs-conid'>RelativeOffset</span>      <span class='hs-comment'>--- ^ Number of messages to skip after seeking</span>
-<a name="line-233"></a>       <span class='hs-layout'>)</span>
-<a name="line-234"></a><span class='hs-definition'>lookupPosition</span> <span class='hs-varid'>targetOffset</span> <span class='hs-conid'>Topic</span><span class='hs-layout'>{</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>}</span> <span class='hs-keyglyph'>=</span>
-<a name="line-235"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>relevantSegments</span> <span class='hs-keyglyph'>=</span>
-<a name="line-236"></a>          <span class='hs-varid'>dropUntilLast</span> <span class='hs-layout'>(</span><span class='hs-layout'>(</span><span class='hs-varop'>&lt;=</span> <span class='hs-varid'>targetOffset</span><span class='hs-layout'>)</span> <span class='hs-varop'>.</span> <span class='hs-varid'>initialOffset</span><span class='hs-layout'>)</span> <span class='hs-varid'>segments</span>
-<a name="line-237"></a>        <span class='hs-layout'>(</span><span class='hs-varid'>position</span><span class='hs-layout'>,</span> <span class='hs-varid'>remainder</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>maybe</span> <span class='hs-layout'>(</span><span class='hs-conid'>LogPosition</span> <span class='hs-num'>0</span><span class='hs-layout'>,</span> <span class='hs-varid'>targetOffset</span> <span class='hs-varop'>.-.</span> <span class='hs-conid'>Offset</span> <span class='hs-num'>0</span><span class='hs-layout'>)</span>
-<a name="line-238"></a>          <span class='hs-layout'>(</span><span class='hs-varid'>lookupPositionSegment</span> <span class='hs-varid'>targetOffset</span><span class='hs-layout'>)</span> <span class='hs-layout'>(</span><span class='hs-varid'>relevantSegments</span> <span class='hs-conid'>VB</span><span class='hs-varop'>.!?</span> <span class='hs-num'>0</span><span class='hs-layout'>)</span>
-<a name="line-239"></a>    <span class='hs-keyword'>in</span> <span class='hs-layout'>(</span><span class='hs-conid'>VB</span><span class='hs-varop'>.</span><span class='hs-varid'>map</span> <span class='hs-varid'>logPath</span> <span class='hs-varid'>relevantSegments</span><span class='hs-layout'>,</span> <span class='hs-varid'>position</span><span class='hs-layout'>,</span> <span class='hs-varid'>remainder</span><span class='hs-layout'>)</span>
-<a name="line-240"></a>
-<a name="line-241"></a><a name="lookupPositionSegment"></a><span class='hs-comment'>-- | Returns a lower bound on the target message's byte position within</span>
-<a name="line-242"></a><span class='hs-comment'>-- a segment's log file. If the offset is negative, return zero. If the</span>
-<a name="line-243"></a><span class='hs-comment'>-- offset is greater than the number of messages within the segment, return</span>
-<a name="line-244"></a><span class='hs-comment'>-- a position close to the end of the segement.</span>
-<a name="line-245"></a><span class='hs-definition'>lookupPositionSegment</span> <span class='hs-keyglyph'>::</span> <span class='hs-conid'>Offset</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Segment</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-layout'>(</span><span class='hs-conid'>LogPosition</span><span class='hs-layout'>,</span> <span class='hs-conid'>RelativeOffset</span><span class='hs-layout'>)</span>
-<a name="line-246"></a><span class='hs-definition'>lookupPositionSegment</span> <span class='hs-varid'>targetOffset</span> <span class='hs-conid'>Segment</span><span class='hs-layout'>{</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>}</span> <span class='hs-keyglyph'>=</span>
-<a name="line-247"></a>    <span class='hs-varid'>lookupPositionIndex</span> <span class='hs-layout'>(</span><span class='hs-varid'>targetOffset</span> <span class='hs-varop'>.-.</span> <span class='hs-varid'>initialOffset</span><span class='hs-layout'>)</span> <span class='hs-varid'>index</span>
-<a name="line-248"></a>
-<a name="line-249"></a><a name="lookupPositionIndex"></a><span class='hs-comment'>-- | Returns the byte position of some message within the</span>
-<a name="line-250"></a><span class='hs-comment'>-- corresponding log file, and the offset by which this message precedes</span>
-<a name="line-251"></a><span class='hs-comment'>-- the target.</span>
-<a name="line-252"></a><span class='hs-comment'>--</span>
-<a name="line-253"></a><span class='hs-comment'>-- - If the target message is contained in this segment, then</span>
-<a name="line-254"></a><span class='hs-comment'>--   this offset will be non-negative and small.</span>
-<a name="line-255"></a><span class='hs-comment'>-- - If the target is in an earlier segment, the position will be zero and</span>
-<a name="line-256"></a><span class='hs-comment'>--   the offset will be negative.</span>
-<a name="line-257"></a><span class='hs-comment'>-- - If the target is in a later segment, the position will be somewhere</span>
-<a name="line-258"></a><span class='hs-comment'>--   near the end of the log file and the offset will likely be large.</span>
-<a name="line-259"></a><span class='hs-definition'>lookupPositionIndex</span> <span class='hs-keyglyph'>::</span> <span class='hs-conid'>RelativeOffset</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Index</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-layout'>(</span><span class='hs-conid'>LogPosition</span><span class='hs-layout'>,</span> <span class='hs-conid'>RelativeOffset</span><span class='hs-layout'>)</span>
-<a name="line-260"></a><span class='hs-definition'>lookupPositionIndex</span> <span class='hs-varid'>targetOffset</span> <span class='hs-varid'>index</span> <span class='hs-keyglyph'>=</span>
-<a name="line-261"></a>    <span class='hs-varid'>fromMaybe</span> <span class='hs-layout'>(</span><span class='hs-conid'>LogPosition</span> <span class='hs-num'>0</span><span class='hs-layout'>,</span> <span class='hs-varid'>targetOffset</span><span class='hs-layout'>)</span> <span class='hs-varop'>$</span> <span class='hs-keyword'>do</span>
-<a name="line-262"></a>        <span class='hs-varid'>entry</span> <span class='hs-keyglyph'>&lt;-</span> <span class='hs-varid'>findLastInit</span> <span class='hs-layout'>(</span><span class='hs-layout'>(</span><span class='hs-varop'>&lt;=</span> <span class='hs-varid'>targetOffset</span><span class='hs-layout'>)</span> <span class='hs-varop'>.</span> <span class='hs-varid'>relativeOffset</span><span class='hs-layout'>)</span> <span class='hs-varid'>index</span>
-<a name="line-263"></a>        <span class='hs-varid'>return</span> <span class='hs-layout'>(</span><span class='hs-varid'>logPosition</span> <span class='hs-varid'>entry</span><span class='hs-layout'>,</span> <span class='hs-varid'>targetOffset</span> <span class='hs-varop'>^-^</span> <span class='hs-varid'>relativeOffset</span> <span class='hs-varid'>entry</span><span class='hs-layout'>)</span>
-<a name="line-264"></a>
-<a name="line-265"></a>
-<a name="line-266"></a><span class='hs-comment'>-------------------------------------------------------------------------------</span>
-<a name="line-267"></a><span class='hs-comment'>-- Pretty-printing</span>
-<a name="line-268"></a>
-<a name="line-269"></a><a name="ppMessage"></a><span class='hs-comment'>-- | Pretty-print a message in the format</span>
-<a name="line-270"></a><span class='hs-comment'>--</span>
-<a name="line-271"></a><span class='hs-comment'>-- &gt; &lt;offset&gt;: [key:] &lt;value&gt;</span>
-<a name="line-272"></a><span class='hs-definition'>ppMessage</span> <span class='hs-keyglyph'>::</span> <span class='hs-conid'>MessageEntry</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>String</span>
-<a name="line-273"></a><span class='hs-definition'>ppMessage</span> <span class='hs-conid'>MessageEntry</span><span class='hs-layout'>{</span><span class='hs-varid'>offset</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>Offset</span> <span class='hs-varid'>o</span><span class='hs-layout'>,</span> <span class='hs-varid'>message</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>Message</span><span class='hs-layout'>{</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>}</span><span class='hs-layout'>}</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>concat</span>
-<a name="line-274"></a>    <span class='hs-keyglyph'>[</span> <span class='hs-varid'>show</span> <span class='hs-varid'>o</span> <span class='hs-varop'>&lt;&gt;</span> <span class='hs-str'>": "</span>
-<a name="line-275"></a>    <span class='hs-layout'>,</span> <span class='hs-keyword'>case</span> <span class='hs-varid'>key</span>   <span class='hs-keyword'>of</span> <span class='hs-conid'>Just</span> <span class='hs-varid'>k</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-varid'>show</span> <span class='hs-varid'>k</span> <span class='hs-varop'>&lt;&gt;</span> <span class='hs-str'>": "</span><span class='hs-layout'>;</span> <span class='hs-conid'>Nothing</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-str'>""</span>
-<a name="line-276"></a>    <span class='hs-layout'>,</span> <span class='hs-keyword'>case</span> <span class='hs-varid'>value</span> <span class='hs-keyword'>of</span> <span class='hs-conid'>Just</span> <span class='hs-varid'>v</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-varid'>show</span> <span class='hs-varid'>v</span><span class='hs-layout'>;</span> <span class='hs-conid'>Nothing</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-str'>"&lt;no value&gt;"</span>
-<a name="line-277"></a>    <span class='hs-keyglyph'>]</span>
-<a name="line-278"></a>
+<a name="line-79"></a><span class='hs-comment'>-- - Kafka only flushes its logs to disk periodically. This means that new</span>
+<a name="line-80"></a><span class='hs-comment'>--   messages in a topic will be absent from the on-disk logs for some</span>
+<a name="line-81"></a><span class='hs-comment'>--   amount of time.</span>
+<a name="line-82"></a><span class='hs-comment'>--</span>
+<a name="line-83"></a><span class='hs-keyword'>module</span> <span class='hs-conid'>Database</span><span class='hs-varop'>.</span><span class='hs-conid'>Kafkar</span>
+<a name="line-84"></a>    <span class='hs-layout'>(</span> <span class='hs-comment'>-- * Core API</span>
+<a name="line-85"></a>      <span class='hs-varid'>loadTopic</span>   <span class='hs-comment'>-- :: FilePath -&gt; String -&gt; Int -&gt; IO Topic</span>
+<a name="line-86"></a>    <span class='hs-layout'>,</span> <span class='hs-varid'>readTopic</span>   <span class='hs-comment'>-- :: Topic -&gt; Offset -&gt; Producer MessageEntry IO ()</span>
+<a name="line-87"></a>
+<a name="line-88"></a>      <span class='hs-comment'>-- * Types</span>
+<a name="line-89"></a>    <span class='hs-layout'>,</span> <span class='hs-conid'>MessageEntry</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
+<a name="line-90"></a>    <span class='hs-layout'>,</span> <span class='hs-conid'>Message</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
+<a name="line-91"></a>    <span class='hs-layout'>,</span> <span class='hs-conid'>Attributes</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
+<a name="line-92"></a>    <span class='hs-layout'>,</span> <span class='hs-conid'>Codec</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
+<a name="line-93"></a>    <span class='hs-layout'>,</span> <span class='hs-conid'>Offset</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
+<a name="line-94"></a>
+<a name="line-95"></a>      <span class='hs-comment'>-- * Pretty-printing</span>
+<a name="line-96"></a>    <span class='hs-layout'>,</span> <span class='hs-varid'>ppMessage</span>   <span class='hs-comment'>-- :: MessageEntry -&gt; String</span>
+<a name="line-97"></a>    <span class='hs-layout'>)</span> <span class='hs-keyword'>where</span>
+<a name="line-98"></a>
+<a name="line-99"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Control</span><span class='hs-varop'>.</span><span class='hs-conid'>Exception</span> <span class='hs-layout'>(</span><span class='hs-varid'>throwIO</span><span class='hs-layout'>)</span>
+<a name="line-100"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Control</span><span class='hs-varop'>.</span><span class='hs-conid'>Monad</span>
+<a name="line-101"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Control</span><span class='hs-varop'>.</span><span class='hs-conid'>Monad</span><span class='hs-varop'>.</span><span class='hs-conid'>IO</span><span class='hs-varop'>.</span><span class='hs-conid'>Class</span>
+<a name="line-102"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>AffineSpace</span>
+<a name="line-103"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>AdditiveGroup</span>
+<a name="line-104"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Attoparsec</span><span class='hs-varop'>.</span><span class='hs-conid'>ByteString</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>AP</span>
+<a name="line-105"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>ByteString</span> <span class='hs-layout'>(</span><span class='hs-conid'>ByteString</span><span class='hs-layout'>)</span>
+<a name="line-106"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>ByteString</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>BS</span>
+<a name="line-107"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Function</span>
+<a name="line-108"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>List</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>L</span>
+<a name="line-109"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Maybe</span>
+<a name="line-110"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Monoid</span>
+<a name="line-111"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Traversable</span>
+<a name="line-112"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Vector</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>VB</span>
+<a name="line-113"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Pipes</span> <span class='hs-varid'>hiding</span> <span class='hs-layout'>(</span><span class='hs-varid'>for</span><span class='hs-layout'>)</span>
+<a name="line-114"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Pipes</span><span class='hs-varop'>.</span><span class='hs-conid'>Safe</span>
+<a name="line-115"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Pipes</span><span class='hs-varop'>.</span><span class='hs-conid'>Prelude</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>P</span>
+<a name="line-116"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Pipes</span><span class='hs-varop'>.</span><span class='hs-conid'>Safe</span><span class='hs-varop'>.</span><span class='hs-conid'>Prelude</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>P</span>
+<a name="line-117"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Pipes</span><span class='hs-varop'>.</span><span class='hs-conid'>Attoparsec</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>PAP</span>
+<a name="line-118"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>Pipes</span><span class='hs-varop'>.</span><span class='hs-conid'>ByteString</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>PBS</span>
+<a name="line-119"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>System</span><span class='hs-varop'>.</span><span class='hs-conid'>Directory</span>
+<a name="line-120"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>System</span><span class='hs-varop'>.</span><span class='hs-conid'>Exit</span>
+<a name="line-121"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>System</span><span class='hs-varop'>.</span><span class='hs-conid'>FilePath</span>
+<a name="line-122"></a><span class='hs-keyword'>import</span> <span class='hs-keyword'>qualified</span> <span class='hs-conid'>System</span><span class='hs-varop'>.</span><span class='hs-conid'>IO</span> <span class='hs-keyword'>as</span> <span class='hs-conid'>IO</span>
+<a name="line-123"></a>
+<a name="line-124"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Database</span><span class='hs-varop'>.</span><span class='hs-conid'>Kafkar</span><span class='hs-varop'>.</span><span class='hs-conid'>Compression</span>
+<a name="line-125"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Database</span><span class='hs-varop'>.</span><span class='hs-conid'>Kafkar</span><span class='hs-varop'>.</span><span class='hs-conid'>Parsers</span>
+<a name="line-126"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Database</span><span class='hs-varop'>.</span><span class='hs-conid'>Kafkar</span><span class='hs-varop'>.</span><span class='hs-conid'>Types</span>
+<a name="line-127"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Database</span><span class='hs-varop'>.</span><span class='hs-conid'>Kafkar</span><span class='hs-varop'>.</span><span class='hs-conid'>Util</span>
+<a name="line-128"></a>
+<a name="line-129"></a>
+<a name="line-130"></a><span class='hs-comment'>-- | Just for testing in GHCi</span>
+<a name="line-131"></a><span class='hs-sel'>_loadTopic</span> <span class='hs-keyglyph'>::</span> <span class='hs-conid'>String</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>IO</span> <span class='hs-conid'>Topic</span>
+<a name="line-132"></a><span class='hs-sel'>_loadTopic</span> <span class='hs-varid'>topicName</span> <span class='hs-keyglyph'>=</span>
+<a name="line-133"></a>    <span class='hs-varid'>loadTopic</span> <span class='hs-str'>"/var/lib/kafka"</span> <span class='hs-varid'>topicName</span> <span class='hs-num'>0</span>
+<a name="line-134"></a>
+<a name="line-135"></a><a name="loadTopic"></a><span class='hs-comment'>-- | Create a handle for a topic/partition stored on the filesystem.</span>
+<a name="line-136"></a><span class='hs-comment'>--</span>
+<a name="line-137"></a><span class='hs-comment'>-- This function will read all index files for the given topic into memory</span>
+<a name="line-138"></a><span class='hs-comment'>-- (~10KB per segment). It will not read any log data. The returned value</span>
+<a name="line-139"></a><span class='hs-comment'>-- should not contain any thunks.</span>
+<a name="line-140"></a><span class='hs-definition'>loadTopic</span>
+<a name="line-141"></a>    <span class='hs-keyglyph'>::</span> <span class='hs-conid'>FilePath</span>  <span class='hs-comment'>-- ^ Kafka log directory (eg. \/var\/lib\/kafka)</span>
+<a name="line-142"></a>    <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>String</span>    <span class='hs-comment'>-- ^ Topic name</span>
+<a name="line-143"></a>    <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Int</span>       <span class='hs-comment'>-- ^ Partition number</span>
+<a name="line-144"></a>    <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>IO</span> <span class='hs-conid'>Topic</span>
+<a name="line-145"></a><span class='hs-definition'>loadTopic</span> <span class='hs-varid'>logDir</span> <span class='hs-varid'>topicName</span> <span class='hs-varid'>partition</span> <span class='hs-keyglyph'>=</span> <span class='hs-keyword'>do</span>
+<a name="line-146"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>topicDir</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>logDir</span> <span class='hs-varop'>&lt;/&gt;</span> <span class='hs-varid'>topicName</span> <span class='hs-varop'>++</span> <span class='hs-str'>"-"</span> <span class='hs-varop'>++</span> <span class='hs-varid'>show</span> <span class='hs-varid'>partition</span>
+<a name="line-147"></a>    <span class='hs-varid'>listing</span> <span class='hs-keyglyph'>&lt;-</span> <span class='hs-varid'>map</span> <span class='hs-layout'>(</span><span class='hs-varid'>topicDir</span> <span class='hs-varop'>&lt;/&gt;</span><span class='hs-layout'>)</span> <span class='hs-varop'>&lt;$&gt;</span> <span class='hs-varid'>listDirectory</span> <span class='hs-varid'>topicDir</span>
+<a name="line-148"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>logs</span>    <span class='hs-keyglyph'>=</span> <span class='hs-conid'>L</span><span class='hs-varop'>.</span><span class='hs-varid'>sort</span> <span class='hs-varop'>$</span> <span class='hs-varid'>filter</span> <span class='hs-layout'>(</span><span class='hs-str'>".log"</span>   <span class='hs-varop'>`</span><span class='hs-conid'>L</span><span class='hs-varop'>.</span><span class='hs-varid'>isSuffixOf</span><span class='hs-varop'>`</span><span class='hs-layout'>)</span> <span class='hs-varid'>listing</span>
+<a name="line-149"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>indices</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>L</span><span class='hs-varop'>.</span><span class='hs-varid'>sort</span> <span class='hs-varop'>$</span> <span class='hs-varid'>filter</span> <span class='hs-layout'>(</span><span class='hs-str'>".index"</span> <span class='hs-varop'>`</span><span class='hs-conid'>L</span><span class='hs-varop'>.</span><span class='hs-varid'>isSuffixOf</span><span class='hs-varop'>`</span><span class='hs-layout'>)</span> <span class='hs-varid'>listing</span>
+<a name="line-150"></a>    <span class='hs-varid'>rawSegments</span> <span class='hs-keyglyph'>&lt;-</span> <span class='hs-varid'>for</span> <span class='hs-layout'>(</span><span class='hs-varid'>zip</span> <span class='hs-varid'>logs</span> <span class='hs-varid'>indices</span><span class='hs-layout'>)</span> <span class='hs-varop'>$</span> <span class='hs-keyglyph'>\</span><span class='hs-layout'>(</span><span class='hs-varid'>logPath</span><span class='hs-layout'>,</span> <span class='hs-varid'>idxPath</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-keyword'>do</span>
+<a name="line-151"></a>        <span class='hs-keyword'>let</span> <span class='hs-varid'>logOffset</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>Offset</span> <span class='hs-varop'>$</span> <span class='hs-varid'>read</span> <span class='hs-varop'>$</span> <span class='hs-varid'>dropExtension</span> <span class='hs-varop'>$</span> <span class='hs-varid'>takeFileName</span> <span class='hs-varid'>logPath</span>
+<a name="line-152"></a>        <span class='hs-keyword'>let</span> <span class='hs-varid'>idxOffset</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>Offset</span> <span class='hs-varop'>$</span> <span class='hs-varid'>read</span> <span class='hs-varop'>$</span> <span class='hs-varid'>dropExtension</span> <span class='hs-varop'>$</span> <span class='hs-varid'>takeFileName</span> <span class='hs-varid'>idxPath</span>
+<a name="line-153"></a>        <span class='hs-varid'>unless</span> <span class='hs-layout'>(</span><span class='hs-varid'>logOffset</span> <span class='hs-varop'>==</span> <span class='hs-varid'>idxOffset</span><span class='hs-layout'>)</span> <span class='hs-varid'>exitFailure</span>
+<a name="line-154"></a>        <span class='hs-varid'>index</span> <span class='hs-keyglyph'>&lt;-</span> <span class='hs-varid'>loadIndex</span> <span class='hs-varid'>idxPath</span>
+<a name="line-155"></a>        <span class='hs-varid'>return</span> <span class='hs-varop'>$!</span> <span class='hs-conid'>Segment</span><span class='hs-layout'>{</span><span class='hs-varid'>initialOffset</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>logOffset</span><span class='hs-layout'>,</span> <span class='hs-keyglyph'>..</span><span class='hs-layout'>}</span>
+<a name="line-156"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>segments</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>VB</span><span class='hs-varop'>.</span><span class='hs-varid'>fromList</span> <span class='hs-varop'>$</span> <span class='hs-conid'>L</span><span class='hs-varop'>.</span><span class='hs-varid'>sortBy</span> <span class='hs-layout'>(</span><span class='hs-varid'>compare</span> <span class='hs-varop'>`on`</span> <span class='hs-varid'>initialOffset</span><span class='hs-layout'>)</span> <span class='hs-varid'>rawSegments</span>
+<a name="line-157"></a>    <span class='hs-varid'>return</span> <span class='hs-conid'>Topic</span><span class='hs-layout'>{</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>}</span>
+<a name="line-158"></a>
+<a name="line-159"></a><a name="loadIndex"></a><span class='hs-comment'>-- | Load an index file completely into memory and parse it.</span>
+<a name="line-160"></a><span class='hs-definition'>loadIndex</span> <span class='hs-keyglyph'>::</span> <span class='hs-conid'>FilePath</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>IO</span> <span class='hs-conid'>Index</span>
+<a name="line-161"></a><span class='hs-definition'>loadIndex</span> <span class='hs-varid'>idxPath</span> <span class='hs-keyglyph'>=</span>
+<a name="line-162"></a>    <span class='hs-varid'>either</span> <span class='hs-layout'>(</span><span class='hs-varid'>error</span> <span class='hs-str'>"loadIndex: TODO"</span><span class='hs-layout'>)</span> <span class='hs-varid'>id</span> <span class='hs-varop'>.</span> <span class='hs-conid'>AP</span><span class='hs-varop'>.</span><span class='hs-varid'>parseOnly</span> <span class='hs-varid'>parseIndex</span> <span class='hs-varop'>&lt;$&gt;</span>
+<a name="line-163"></a>      <span class='hs-conid'>BS</span><span class='hs-varop'>.</span><span class='hs-varid'>readFile</span> <span class='hs-varid'>idxPath</span>
+<a name="line-164"></a>
+<a name="line-165"></a><a name="readTopic"></a><span class='hs-comment'>-- | Stream messages from the given topic, starting at the given offset.</span>
+<a name="line-166"></a><span class='hs-comment'>--</span>
+<a name="line-167"></a><span class='hs-comment'>-- This function uses the Kafka index to perform an efficient seek to the</span>
+<a name="line-168"></a><span class='hs-comment'>-- desired offset. Given that the index is in memory, a seek should require</span>
+<a name="line-169"></a><span class='hs-comment'>-- reading a bounded number of bytes (determined by the density of the</span>
+<a name="line-170"></a><span class='hs-comment'>-- index).</span>
+<a name="line-171"></a><span class='hs-comment'>--</span>
+<a name="line-172"></a><span class='hs-comment'>-- It then streams messages from the log file, parsing and decompressing</span>
+<a name="line-173"></a><span class='hs-comment'>-- them. The `compression` attribute should always be `None` for messages</span>
+<a name="line-174"></a><span class='hs-comment'>-- returned by this function.</span>
+<a name="line-175"></a><span class='hs-comment'>--</span>
+<a name="line-176"></a><span class='hs-comment'>-- Kafka logs are stored in multiple segments. This function should only</span>
+<a name="line-177"></a><span class='hs-comment'>-- hold a read handle for one segment file at a time.</span>
+<a name="line-178"></a><span class='hs-definition'>readTopic</span>
+<a name="line-179"></a>    <span class='hs-keyglyph'>::</span> <span class='hs-layout'>(</span><span class='hs-conid'>MonadSafe</span> <span class='hs-varid'>m</span><span class='hs-layout'>)</span>
+<a name="line-180"></a>    <span class='hs-keyglyph'>=&gt;</span> <span class='hs-conid'>Topic</span>      <span class='hs-comment'>-- ^ Topic handle to read from</span>
+<a name="line-181"></a>    <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Offset</span>     <span class='hs-comment'>-- ^ Offset to begin reading at, given as a number of</span>
+<a name="line-182"></a>                  <span class='hs-comment'>--   messages since the start of the topic.</span>
+<a name="line-183"></a>    <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Producer</span> <span class='hs-conid'>MessageEntry</span> <span class='hs-varid'>m</span> <span class='hs-conid'>()</span>
+<a name="line-184"></a><span class='hs-definition'>readTopic</span> <span class='hs-varid'>topic</span> <span class='hs-varid'>targetOffset</span> <span class='hs-keyglyph'>=</span> <span class='hs-keyword'>do</span>
+<a name="line-185"></a>    <span class='hs-keyword'>let</span> <span class='hs-layout'>(</span><span class='hs-varid'>logFiles</span><span class='hs-layout'>,</span> <span class='hs-varid'>startPos</span><span class='hs-layout'>,</span> <span class='hs-varid'>remainingMsgs</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>lookupPosition</span> <span class='hs-varid'>targetOffset</span> <span class='hs-varid'>topic</span>
+<a name="line-186"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>positions</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>startPos</span> <span class='hs-conop'>:</span> <span class='hs-varid'>repeat</span> <span class='hs-layout'>(</span><span class='hs-conid'>LogPosition</span> <span class='hs-num'>0</span><span class='hs-layout'>)</span>
+<a name="line-187"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>msgsFromStartPos</span> <span class='hs-keyglyph'>=</span>
+<a name="line-188"></a>          <span class='hs-varid'>mapM_</span> <span class='hs-layout'>(</span><span class='hs-varid'>uncurry</span> <span class='hs-varid'>readLog</span><span class='hs-layout'>)</span> <span class='hs-layout'>(</span><span class='hs-varid'>zip</span> <span class='hs-layout'>(</span><span class='hs-conid'>VB</span><span class='hs-varop'>.</span><span class='hs-varid'>toList</span> <span class='hs-varid'>logFiles</span><span class='hs-layout'>)</span> <span class='hs-varid'>positions</span><span class='hs-layout'>)</span>
+<a name="line-189"></a>    <span class='hs-varid'>msgsFromStartPos</span> <span class='hs-varop'>&gt;-&gt;</span> <span class='hs-varid'>dropMessages</span> <span class='hs-varid'>remainingMsgs</span>
+<a name="line-190"></a>
+<a name="line-191"></a><a name="dropMessages"></a><span class='hs-definition'>dropMessages</span> <span class='hs-keyglyph'>::</span> <span class='hs-layout'>(</span><span class='hs-conid'>Monad</span> <span class='hs-varid'>m</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=&gt;</span> <span class='hs-conid'>RelativeOffset</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Pipe</span> <span class='hs-conid'>MessageEntry</span> <span class='hs-conid'>MessageEntry</span> <span class='hs-varid'>m</span> <span class='hs-conid'>()</span>
+<a name="line-192"></a><span class='hs-definition'>dropMessages</span> <span class='hs-layout'>(</span><span class='hs-conid'>RelativeOffset</span> <span class='hs-varid'>offset</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>P</span><span class='hs-varop'>.</span><span class='hs-varid'>drop</span> <span class='hs-layout'>(</span><span class='hs-varid'>fromIntegral</span> <span class='hs-varid'>offset</span><span class='hs-layout'>)</span>
+<a name="line-193"></a>
+<a name="line-194"></a><a name="readLog"></a><span class='hs-comment'>-- | Read the given log file from the specified byte offset, and parse the</span>
+<a name="line-195"></a><span class='hs-comment'>-- result as a sequence of `Message`s. Parse errors are raised as</span>
+<a name="line-196"></a><span class='hs-comment'>-- exceptions. If the given offset doesn't correspond to a message</span>
+<a name="line-197"></a><span class='hs-comment'>-- boundary, this will (likely) cause a parse error.</span>
+<a name="line-198"></a><span class='hs-comment'>--</span>
+<a name="line-199"></a><span class='hs-comment'>-- The resulting messages have `compression = None`, and their offsets are</span>
+<a name="line-200"></a><span class='hs-comment'>-- sequential and dense.</span>
+<a name="line-201"></a><span class='hs-definition'>readLog</span>
+<a name="line-202"></a>    <span class='hs-keyglyph'>::</span> <span class='hs-layout'>(</span><span class='hs-conid'>MonadSafe</span> <span class='hs-varid'>m</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=&gt;</span> <span class='hs-conid'>FilePath</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>LogPosition</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Producer</span> <span class='hs-conid'>MessageEntry</span> <span class='hs-varid'>m</span> <span class='hs-conid'>()</span>
+<a name="line-203"></a><span class='hs-definition'>readLog</span> <span class='hs-varid'>path</span> <span class='hs-varid'>offset</span> <span class='hs-keyglyph'>=</span>
+<a name="line-204"></a>    <span class='hs-varid'>decompressStream</span> <span class='hs-varop'>$</span> <span class='hs-varid'>readLogCompressed</span> <span class='hs-varid'>path</span> <span class='hs-varid'>offset</span>
+<a name="line-205"></a>
+<a name="line-206"></a><a name="readLogCompressed"></a><span class='hs-comment'>-- The resulting message may have a mix of compression attributes, and</span>
+<a name="line-207"></a><span class='hs-comment'>-- their offsets are in-order but not dense. The offset of a compressed</span>
+<a name="line-208"></a><span class='hs-comment'>-- message indicates the offset of the *last* message stored in its value</span>
+<a name="line-209"></a><span class='hs-comment'>-- field.</span>
+<a name="line-210"></a><span class='hs-definition'>readLogCompressed</span>
+<a name="line-211"></a>    <span class='hs-keyglyph'>::</span> <span class='hs-layout'>(</span><span class='hs-conid'>MonadSafe</span> <span class='hs-varid'>m</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=&gt;</span> <span class='hs-conid'>FilePath</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>LogPosition</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Producer</span> <span class='hs-conid'>MessageEntry</span> <span class='hs-varid'>m</span> <span class='hs-conid'>()</span>
+<a name="line-212"></a><span class='hs-definition'>readLogCompressed</span> <span class='hs-varid'>path</span> <span class='hs-layout'>(</span><span class='hs-conid'>LogPosition</span> <span class='hs-varid'>offset</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=</span> <span class='hs-keyword'>do</span>
+<a name="line-213"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>rawData</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>readFileFromOffset</span> <span class='hs-varid'>path</span> <span class='hs-layout'>(</span><span class='hs-varid'>fromIntegral</span> <span class='hs-varid'>offset</span><span class='hs-layout'>)</span>
+<a name="line-214"></a>    <span class='hs-varid'>ret</span> <span class='hs-keyglyph'>&lt;-</span> <span class='hs-conid'>PAP</span><span class='hs-varop'>.</span><span class='hs-varid'>parsed</span> <span class='hs-varid'>parseMessageEntry</span> <span class='hs-varid'>rawData</span>
+<a name="line-215"></a>    <span class='hs-varid'>liftIO</span> <span class='hs-varop'>$</span> <span class='hs-varid'>either</span> <span class='hs-layout'>(</span><span class='hs-varid'>throwIO</span> <span class='hs-varop'>.</span> <span class='hs-varid'>fst</span><span class='hs-layout'>)</span> <span class='hs-varid'>return</span> <span class='hs-varid'>ret</span>
+<a name="line-216"></a>
+<a name="line-217"></a><a name="readFileFromOffset"></a><span class='hs-comment'>-- | Read the given file from the specified byte offset.</span>
+<a name="line-218"></a><span class='hs-definition'>readFileFromOffset</span>
+<a name="line-219"></a>    <span class='hs-keyglyph'>::</span> <span class='hs-layout'>(</span><span class='hs-conid'>MonadSafe</span> <span class='hs-varid'>m</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=&gt;</span> <span class='hs-conid'>FilePath</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Int</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Producer</span> <span class='hs-conid'>ByteString</span> <span class='hs-varid'>m</span> <span class='hs-conid'>()</span>
+<a name="line-220"></a><span class='hs-definition'>readFileFromOffset</span> <span class='hs-varid'>path</span> <span class='hs-varid'>offset</span> <span class='hs-keyglyph'>=</span>
+<a name="line-221"></a>    <span class='hs-conid'>P</span><span class='hs-varop'>.</span><span class='hs-varid'>withFile</span> <span class='hs-varid'>path</span> <span class='hs-conid'>IO</span><span class='hs-varop'>.</span><span class='hs-conid'>ReadMode</span> <span class='hs-varop'>$</span> <span class='hs-keyglyph'>\</span><span class='hs-varid'>h</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-keyword'>do</span>
+<a name="line-222"></a>      <span class='hs-varid'>liftIO</span> <span class='hs-varop'>$</span> <span class='hs-conid'>IO</span><span class='hs-varop'>.</span><span class='hs-varid'>hSeek</span> <span class='hs-varid'>h</span> <span class='hs-conid'>IO</span><span class='hs-varop'>.</span><span class='hs-conid'>AbsoluteSeek</span> <span class='hs-layout'>(</span><span class='hs-varid'>fromIntegral</span> <span class='hs-varid'>offset</span><span class='hs-layout'>)</span>
+<a name="line-223"></a>      <span class='hs-conid'>PBS</span><span class='hs-varop'>.</span><span class='hs-varid'>fromHandle</span> <span class='hs-varid'>h</span>
+<a name="line-224"></a>
+<a name="line-225"></a><span class='hs-comment'>-------------------------------------------------------------------------------</span>
+<a name="line-226"></a><span class='hs-comment'>-- Reading the index</span>
+<a name="line-227"></a>
+<a name="line-228"></a><a name="lookupPosition"></a><span class='hs-comment'>-- | TODO</span>
+<a name="line-229"></a><span class='hs-definition'>lookupPosition</span>
+<a name="line-230"></a>    <span class='hs-keyglyph'>::</span> <span class='hs-conid'>Offset</span>   <span class='hs-comment'>-- ^ The target message</span>
+<a name="line-231"></a>    <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Topic</span>    <span class='hs-comment'>-- ^ The topic</span>
+<a name="line-232"></a>    <span class='hs-keyglyph'>-&gt;</span> <span class='hs-layout'>(</span> <span class='hs-conid'>VB</span><span class='hs-varop'>.</span><span class='hs-conid'>Vector</span> <span class='hs-conid'>FilePath</span>  <span class='hs-comment'>--- ^ Paths of the relevant log files</span>
+<a name="line-233"></a>       <span class='hs-layout'>,</span> <span class='hs-conid'>LogPosition</span>         <span class='hs-comment'>--- ^ Starting position within the first file</span>
+<a name="line-234"></a>       <span class='hs-layout'>,</span> <span class='hs-conid'>RelativeOffset</span>      <span class='hs-comment'>--- ^ Number of messages to skip after seeking</span>
+<a name="line-235"></a>       <span class='hs-layout'>)</span>
+<a name="line-236"></a><span class='hs-definition'>lookupPosition</span> <span class='hs-varid'>targetOffset</span> <span class='hs-conid'>Topic</span><span class='hs-layout'>{</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>}</span> <span class='hs-keyglyph'>=</span>
+<a name="line-237"></a>    <span class='hs-keyword'>let</span> <span class='hs-varid'>relevantSegments</span> <span class='hs-keyglyph'>=</span>
+<a name="line-238"></a>          <span class='hs-varid'>dropUntilLast</span> <span class='hs-layout'>(</span><span class='hs-layout'>(</span><span class='hs-varop'>&lt;=</span> <span class='hs-varid'>targetOffset</span><span class='hs-layout'>)</span> <span class='hs-varop'>.</span> <span class='hs-varid'>initialOffset</span><span class='hs-layout'>)</span> <span class='hs-varid'>segments</span>
+<a name="line-239"></a>        <span class='hs-layout'>(</span><span class='hs-varid'>position</span><span class='hs-layout'>,</span> <span class='hs-varid'>remainder</span><span class='hs-layout'>)</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>maybe</span> <span class='hs-layout'>(</span><span class='hs-conid'>LogPosition</span> <span class='hs-num'>0</span><span class='hs-layout'>,</span> <span class='hs-varid'>targetOffset</span> <span class='hs-varop'>.-.</span> <span class='hs-conid'>Offset</span> <span class='hs-num'>0</span><span class='hs-layout'>)</span>
+<a name="line-240"></a>          <span class='hs-layout'>(</span><span class='hs-varid'>lookupPositionSegment</span> <span class='hs-varid'>targetOffset</span><span class='hs-layout'>)</span> <span class='hs-layout'>(</span><span class='hs-varid'>relevantSegments</span> <span class='hs-conid'>VB</span><span class='hs-varop'>.!?</span> <span class='hs-num'>0</span><span class='hs-layout'>)</span>
+<a name="line-241"></a>    <span class='hs-keyword'>in</span> <span class='hs-layout'>(</span><span class='hs-conid'>VB</span><span class='hs-varop'>.</span><span class='hs-varid'>map</span> <span class='hs-varid'>logPath</span> <span class='hs-varid'>relevantSegments</span><span class='hs-layout'>,</span> <span class='hs-varid'>position</span><span class='hs-layout'>,</span> <span class='hs-varid'>remainder</span><span class='hs-layout'>)</span>
+<a name="line-242"></a>
+<a name="line-243"></a><a name="lookupPositionSegment"></a><span class='hs-comment'>-- | Returns a lower bound on the target message's byte position within</span>
+<a name="line-244"></a><span class='hs-comment'>-- a segment's log file. If the offset is negative, return zero. If the</span>
+<a name="line-245"></a><span class='hs-comment'>-- offset is greater than the number of messages within the segment, return</span>
+<a name="line-246"></a><span class='hs-comment'>-- a position close to the end of the segement.</span>
+<a name="line-247"></a><span class='hs-definition'>lookupPositionSegment</span> <span class='hs-keyglyph'>::</span> <span class='hs-conid'>Offset</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Segment</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-layout'>(</span><span class='hs-conid'>LogPosition</span><span class='hs-layout'>,</span> <span class='hs-conid'>RelativeOffset</span><span class='hs-layout'>)</span>
+<a name="line-248"></a><span class='hs-definition'>lookupPositionSegment</span> <span class='hs-varid'>targetOffset</span> <span class='hs-conid'>Segment</span><span class='hs-layout'>{</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>}</span> <span class='hs-keyglyph'>=</span>
+<a name="line-249"></a>    <span class='hs-varid'>lookupPositionIndex</span> <span class='hs-layout'>(</span><span class='hs-varid'>targetOffset</span> <span class='hs-varop'>.-.</span> <span class='hs-varid'>initialOffset</span><span class='hs-layout'>)</span> <span class='hs-varid'>index</span>
+<a name="line-250"></a>
+<a name="line-251"></a><a name="lookupPositionIndex"></a><span class='hs-comment'>-- | Returns the byte position of some message within the</span>
+<a name="line-252"></a><span class='hs-comment'>-- corresponding log file, and the offset by which this message precedes</span>
+<a name="line-253"></a><span class='hs-comment'>-- the target.</span>
+<a name="line-254"></a><span class='hs-comment'>--</span>
+<a name="line-255"></a><span class='hs-comment'>-- - If the target message is contained in this segment, then</span>
+<a name="line-256"></a><span class='hs-comment'>--   this offset will be non-negative and small.</span>
+<a name="line-257"></a><span class='hs-comment'>-- - If the target is in an earlier segment, the position will be zero and</span>
+<a name="line-258"></a><span class='hs-comment'>--   the offset will be negative.</span>
+<a name="line-259"></a><span class='hs-comment'>-- - If the target is in a later segment, the position will be somewhere</span>
+<a name="line-260"></a><span class='hs-comment'>--   near the end of the log file and the offset will likely be large.</span>
+<a name="line-261"></a><span class='hs-definition'>lookupPositionIndex</span> <span class='hs-keyglyph'>::</span> <span class='hs-conid'>RelativeOffset</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>Index</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-layout'>(</span><span class='hs-conid'>LogPosition</span><span class='hs-layout'>,</span> <span class='hs-conid'>RelativeOffset</span><span class='hs-layout'>)</span>
+<a name="line-262"></a><span class='hs-definition'>lookupPositionIndex</span> <span class='hs-varid'>targetOffset</span> <span class='hs-varid'>index</span> <span class='hs-keyglyph'>=</span>
+<a name="line-263"></a>    <span class='hs-varid'>fromMaybe</span> <span class='hs-layout'>(</span><span class='hs-conid'>LogPosition</span> <span class='hs-num'>0</span><span class='hs-layout'>,</span> <span class='hs-varid'>targetOffset</span><span class='hs-layout'>)</span> <span class='hs-varop'>$</span> <span class='hs-keyword'>do</span>
+<a name="line-264"></a>        <span class='hs-varid'>entry</span> <span class='hs-keyglyph'>&lt;-</span> <span class='hs-varid'>findLastInit</span> <span class='hs-layout'>(</span><span class='hs-layout'>(</span><span class='hs-varop'>&lt;=</span> <span class='hs-varid'>targetOffset</span><span class='hs-layout'>)</span> <span class='hs-varop'>.</span> <span class='hs-varid'>relativeOffset</span><span class='hs-layout'>)</span> <span class='hs-varid'>index</span>
+<a name="line-265"></a>        <span class='hs-varid'>return</span> <span class='hs-layout'>(</span><span class='hs-varid'>logPosition</span> <span class='hs-varid'>entry</span><span class='hs-layout'>,</span> <span class='hs-varid'>targetOffset</span> <span class='hs-varop'>^-^</span> <span class='hs-varid'>relativeOffset</span> <span class='hs-varid'>entry</span><span class='hs-layout'>)</span>
+<a name="line-266"></a>
+<a name="line-267"></a>
+<a name="line-268"></a><span class='hs-comment'>-------------------------------------------------------------------------------</span>
+<a name="line-269"></a><span class='hs-comment'>-- Pretty-printing</span>
+<a name="line-270"></a>
+<a name="line-271"></a><a name="ppMessage"></a><span class='hs-comment'>-- | Pretty-print a message in the format</span>
+<a name="line-272"></a><span class='hs-comment'>--</span>
+<a name="line-273"></a><span class='hs-comment'>-- &gt; &lt;offset&gt;: [key:] &lt;value&gt;</span>
+<a name="line-274"></a><span class='hs-definition'>ppMessage</span> <span class='hs-keyglyph'>::</span> <span class='hs-conid'>MessageEntry</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-conid'>String</span>
+<a name="line-275"></a><span class='hs-definition'>ppMessage</span> <span class='hs-conid'>MessageEntry</span><span class='hs-layout'>{</span><span class='hs-varid'>offset</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>Offset</span> <span class='hs-varid'>o</span><span class='hs-layout'>,</span> <span class='hs-varid'>message</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>Message</span><span class='hs-layout'>{</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>}</span><span class='hs-layout'>}</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>concat</span>
+<a name="line-276"></a>    <span class='hs-keyglyph'>[</span> <span class='hs-varid'>show</span> <span class='hs-varid'>o</span> <span class='hs-varop'>&lt;&gt;</span> <span class='hs-str'>": "</span>
+<a name="line-277"></a>    <span class='hs-layout'>,</span> <span class='hs-keyword'>case</span> <span class='hs-varid'>key</span>   <span class='hs-keyword'>of</span> <span class='hs-conid'>Just</span> <span class='hs-varid'>k</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-varid'>show</span> <span class='hs-varid'>k</span> <span class='hs-varop'>&lt;&gt;</span> <span class='hs-str'>": "</span><span class='hs-layout'>;</span> <span class='hs-conid'>Nothing</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-str'>""</span>
+<a name="line-278"></a>    <span class='hs-layout'>,</span> <span class='hs-keyword'>case</span> <span class='hs-varid'>value</span> <span class='hs-keyword'>of</span> <span class='hs-conid'>Just</span> <span class='hs-varid'>v</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-varid'>show</span> <span class='hs-varid'>v</span><span class='hs-layout'>;</span> <span class='hs-conid'>Nothing</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-str'>"&lt;no value&gt;"</span>
+<a name="line-279"></a>    <span class='hs-keyglyph'>]</span>
+<a name="line-280"></a>
 </pre></body>
 </html>
