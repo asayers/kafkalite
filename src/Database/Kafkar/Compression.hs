@@ -16,7 +16,7 @@ module Database.Kafkar.Compression
     ) where
 
 import qualified Codec.Compression.GZip.Extras as G
-import qualified Codec.Compression.Snappy.Extras as S
+import qualified Codec.Compression.Snappy.Framed as S
 import Data.ByteString (ByteString)
 import Data.Maybe
 import Pipes
@@ -39,7 +39,7 @@ decompressMsg entry =
     case compression (attributes $ message entry) of
         None   -> yield entry
         GZip   -> decompressStream $ decompressMsgWith G.decompress' entry
-        Snappy -> decompressStream $ decompressMsgWith S.decompress' entry
+        Snappy -> decompressStream $ decompressMsgWith S.decompress_ entry
 
 -- | Given a message which is wrapping a compressed collection of messages,
 -- decompress the value using the provided function, then parse the result

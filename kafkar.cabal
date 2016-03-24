@@ -36,7 +36,6 @@ library
       Database.Kafkar
   other-modules:
       Codec.Compression.GZip.Extras
-      Codec.Compression.Snappy.Extras
       Data.Attoparsec.ByteString.Extras
       Database.Kafkar.Compression
       Database.Kafkar.Parsers
@@ -54,7 +53,7 @@ library
       , pipes-attoparsec
       , pipes-bytestring
       , pipes-safe >= 2.2
-      , snappy
+      , snappy-framed
       , transformers
       , vector
       , vector-space
