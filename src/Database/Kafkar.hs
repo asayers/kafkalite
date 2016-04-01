@@ -32,6 +32,11 @@
 -- >     runSafeT $ runEffect $
 -- >        readTopic topic (Offset 0) >-> P.map ppMessage >-> P.stdoutLn
 --
+-- == Compatibility
+--
+-- We currently support Kafka v0.8 and v0.9, as well as the current
+-- development version of v0.10.
+--
 -- == Operational properties
 --
 -- Memory use is constant-ish, but beware:
