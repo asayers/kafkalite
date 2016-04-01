@@ -26,8 +26,14 @@ parseMessageEntry :: Parser MessageEntry
 parseMessageEntry = do
     offset <- Offset <$> AP.anyInt64be
     size <- fromIntegral <$> AP.anyInt32be
-    message <- parseMessageV0 <|> parseMessageV1
+    message <- parseMessage
     return MessageEntry{..}
+
+parseMessage :: Parser Message
+parseMessage = msum
+    [ MV0 <$> parseMessageV0
+    , MV1 <$> parseMessageV1
+    ]
 
 -- v0
 -- Message => Crc MagicByte Attributes Key Value
@@ -36,14 +42,14 @@ parseMessageEntry = do
 --   Attributes => int8
 --   Key => bytes
 --   Value => bytes
-parseMessageV0 :: Parser Message
+parseMessageV0 :: Parser MessageV0
 parseMessageV0 = do
     _crc <- AP.anyInt32be  -- TODO: check crc
     magic <- AP.anyInt8
     guard $ magic == 0
-    attributes <- parseAttributes
-    key <- kafkaBytes
-    value <- kafkaBytes   -- TODO: make sure these are being evaluated strictly
+    mv0Attributes <- parseAttributes
+    mv0Key <- kafkaBytes
+    mv0Value <- kafkaBytes   -- TODO: make sure these are being evaluated strictly
     return MessageV0{..}
 
 -- v1 (supported since 0.10.0)
@@ -54,15 +60,15 @@ parseMessageV0 = do
 --   Timestamp => int64
 --   Key => bytes
 --   Value => bytes
-parseMessageV1 :: Parser Message
+parseMessageV1 :: Parser MessageV1
 parseMessageV1 = do
     _crc <- AP.anyInt32be  -- TODO: check crc
     magic <- AP.anyInt8
     guard $ magic == 1
-    attributes <- parseAttributes
-    timestamp <- parseTimestamp
-    key <- kafkaBytes
-    value <- kafkaBytes   -- TODO: make sure these are being evaluated strictly
+    mv1Attributes <- parseAttributes
+    mv1Timestamp <- parseTimestamp
+    mv1Key <- kafkaBytes
+    mv1Value <- kafkaBytes   -- TODO: make sure these are being evaluated strictly
     return MessageV1{..}
 
 -- This byte holds metadata attributes about the message. The lowest 2 bits

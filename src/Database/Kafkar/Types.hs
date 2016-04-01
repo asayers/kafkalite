@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Database.Kafkar.Types
     ( -- * Topics
@@ -11,7 +12,8 @@ module Database.Kafkar.Types
 
       -- * Message sets
     , MessageEntry(..)
-    , Message(..)
+    , Message(..), attributes, timestamp, key, value
+    , MessageV0(..), MessageV1(..)
     , Attributes(..)
 
       -- * Indices
@@ -100,17 +102,32 @@ data MessageEntry = MessageEntry
     } deriving (Eq, Show)
 
 data Message
-    = MessageV0
-        { attributes :: {-# UNPACK #-} !Attributes
-        , key        ::                !(Maybe ByteString)
-        , value      ::                !(Maybe ByteString)
-        }
-    | MessageV1
-        { attributes :: {-# UNPACK #-} !Attributes
-        , timestamp  :: {-# UNPACK #-} !Timestamp
-        , key        ::                !(Maybe ByteString)
-        , value      ::                !(Maybe ByteString)
-        }
+    = MV0 MessageV0
+    | MV1 MessageV1
+    deriving (Eq, Show)
+
+attributes :: Message -> Attributes
+timestamp  :: Message -> Maybe Timestamp
+key        :: Message -> Maybe ByteString
+value      :: Message -> Maybe ByteString
+
+data MessageV0 = MessageV0
+    { mv0Attributes :: {-# UNPACK #-} !Attributes
+    , mv0Key        ::                !(Maybe ByteString)
+    , mv0Value      ::                !(Maybe ByteString)
+    } deriving (Eq, Show)
+
+data MessageV1 = MessageV1
+    { mv1Attributes :: {-# UNPACK #-} !Attributes
+    , mv1Timestamp  :: {-# UNPACK #-} !Timestamp
+    , mv1Key        ::                !(Maybe ByteString)
+    , mv1Value      ::                !(Maybe ByteString)
+    } deriving (Eq, Show)
+
+attributes = \case MV0 x -> mv0Attributes x ; MV1 x -> mv1Attributes x
+timestamp  = \case MV0 _ -> Nothing         ; MV1 x -> Just (mv1Timestamp x)
+key        = \case MV0 x -> mv0Key x        ; MV1 x -> mv1Key x
+value      = \case MV0 x -> mv0Value x      ; MV1 x -> mv1Value x
 
 data Attributes = Attributes
     { compression :: !Codec

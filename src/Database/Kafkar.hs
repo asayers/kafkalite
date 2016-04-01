@@ -268,9 +268,9 @@ lookupPositionIndex targetOffset index =
 --
 -- > <offset>: [key:] <value>
 ppMessage :: MessageEntry -> String
-ppMessage MessageEntry{offset = Offset o, message = Message{..}} = concat
+ppMessage MessageEntry{offset = Offset o, message = m} = concat
     [ show o <> ": "
-    , case key   of Just k -> show k <> ": "; Nothing -> ""
-    , case value of Just v -> show v; Nothing -> "<no value>"
+    , case key   m of Just k -> show k <> ": "; Nothing -> ""
+    , case value m of Just v -> show v; Nothing -> "<no value>"
     ]
 
