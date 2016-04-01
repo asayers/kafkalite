@@ -55,6 +55,14 @@
 -- streaming across a segment boundary, for instance, the first segment's
 -- log file is closed as the second segment's log file is opened.
 --
+-- Performance is roughly half of what kafka delivers: on my machine, it
+-- looks like I can get 850,000 messages/second with 0.03s constant
+-- overhead. For comparison, streaming from kafka using kafkacat seems to
+-- give 1,850,000 messages/second with 0.17s of constant overhead. This is
+-- because we go through the trouble of pulling apart each message and
+-- reassembling it on the heap. Not the best design for super-high
+-- performance, but good enough for my purposes.
+--
 -- == Is this a good idea?
 --
 -- The Kafka on-disk format has never been advertised as a stable, portable
