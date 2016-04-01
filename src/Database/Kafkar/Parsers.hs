@@ -26,24 +26,44 @@ parseMessageEntry :: Parser MessageEntry
 parseMessageEntry = do
     offset <- Offset <$> AP.anyInt64be
     size <- fromIntegral <$> AP.anyInt32be
-    message <- parseMessage
+    message <- parseMessageV0 <|> parseMessageV1
     return MessageEntry{..}
 
+-- v0
 -- Message => Crc MagicByte Attributes Key Value
 --   Crc => int32
 --   MagicByte => int8
 --   Attributes => int8
 --   Key => bytes
 --   Value => bytes
-parseMessage :: Parser Message
-parseMessage = do
+parseMessageV0 :: Parser Message
+parseMessageV0 = do
     _crc <- AP.anyInt32be  -- TODO: check crc
     magic <- AP.anyInt8
-    guard $ magic == 0    -- We only support version 0
+    guard $ magic == 0
     attributes <- parseAttributes
     key <- kafkaBytes
     value <- kafkaBytes   -- TODO: make sure these are being evaluated strictly
-    return Message{..}
+    return MessageV0{..}
+
+-- v1 (supported since 0.10.0)
+-- Message => Crc MagicByte Attributes Key Value
+--   Crc => int32
+--   MagicByte => int8
+--   Attributes => int8
+--   Timestamp => int64
+--   Key => bytes
+--   Value => bytes
+parseMessageV1 :: Parser Message
+parseMessageV1 = do
+    _crc <- AP.anyInt32be  -- TODO: check crc
+    magic <- AP.anyInt8
+    guard $ magic == 1
+    attributes <- parseAttributes
+    timestamp <- parseTimestamp
+    key <- kafkaBytes
+    value <- kafkaBytes   -- TODO: make sure these are being evaluated strictly
+    return MessageV1{..}
 
 -- This byte holds metadata attributes about the message. The lowest 2 bits
 -- contain the compression codec used for the message. The other bits
@@ -57,6 +77,10 @@ parseAttributes = do
           2 -> return Snappy
           _ -> fail "Unknown codec"
     return Attributes{..}
+
+parseTimestamp :: Parser Timestamp
+parseTimestamp =
+    Timestamp <$> AP.anyInt64be
 
 -------------------------------------------------------------------------------
 -- Indices

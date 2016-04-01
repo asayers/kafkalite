@@ -23,6 +23,7 @@ module Database.Kafkar.Types
     , Offset(..)
     , RelativeOffset(..)
     , LogPosition(..)
+    , Timestamp(..)
     ) where
 
 import Data.AdditiveGroup
@@ -51,6 +52,10 @@ newtype RelativeOffset = RelativeOffset Int32
 
 -- | The byte-offset of a message within a log file
 newtype LogPosition = LogPosition Int32
+    deriving (Eq, Show, Ord)
+
+-- | The timestamp of a message, in milliseconds since beginning of the epoch
+newtype Timestamp = Timestamp Int64
     deriving (Eq, Show, Ord)
 
 instance AdditiveGroup RelativeOffset where
@@ -94,11 +99,18 @@ data MessageEntry = MessageEntry
     , message ::                !Message
     } deriving (Eq, Show)
 
-data Message = Message
-    { attributes :: {-# UNPACK #-} !Attributes
-    , key        ::                !(Maybe ByteString)
-    , value      ::                !(Maybe ByteString)
-    } deriving (Eq, Show)
+data Message
+    = MessageV0
+        { attributes :: {-# UNPACK #-} !Attributes
+        , key        ::                !(Maybe ByteString)
+        , value      ::                !(Maybe ByteString)
+        }
+    | MessageV1
+        { attributes :: {-# UNPACK #-} !Attributes
+        , timestamp  :: {-# UNPACK #-} !Timestamp
+        , key        ::                !(Maybe ByteString)
+        , value      ::                !(Maybe ByteString)
+        }
 
 data Attributes = Attributes
     { compression :: !Codec
