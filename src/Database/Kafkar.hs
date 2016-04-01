@@ -94,15 +94,17 @@
 --
 module Database.Kafkar
     ( -- * Core API
-      loadTopic   -- :: FilePath -> String -> Int -> IO Topic
+      loadTopic   -- :: FilePath -> TopicName -> Partition -> IO Topic
     , readTopic   -- :: MonadSafe m => Topic -> Offset -> Producer MessageEntry m ()
 
       -- * Types
+    , TopicName
+    , Partition
+    , Offset(..)
     , MessageEntry(..)
     , Message(..)
     , Attributes(..)
     , Codec(..)
-    , Offset(..)
 
       -- * Pretty-printing
     , ppMessage   -- :: MessageEntry -> String
@@ -142,12 +144,12 @@ import Database.Kafkar.Util
 -- | Create a handle for a topic/partition stored on the filesystem.
 --
 -- This function will read all index files for the given topic into memory
--- (~10KB per segment). It will not read any log data. The returned value
+-- (~100KB per segment). It will not read any log data. The returned value
 -- should not contain any thunks.
 loadTopic
     :: FilePath  -- ^ Kafka log directory (eg. \/var\/lib\/kafka)
-    -> String    -- ^ Topic name
-    -> Int       -- ^ Partition number
+    -> TopicName   -- ^ Topic name
+    -> Partition   -- ^ Partition number
     -> IO Topic
 loadTopic logDir topicName partition = do
     let topicDir = logDir </> topicName ++ "-" ++ show partition
@@ -191,8 +193,9 @@ readTopic
                   --   messages since the start of the topic.
     -> Producer MessageEntry m ()
 readTopic topic targetOffset = do
-    let (logFiles, startPos, remainingMsgs) = lookupPosition targetOffset topic
-    let positions = startPos : repeat (LogPosition 0)
+    let (logFiles, startPos, remainingMsgs) =
+            lookupPositionInTopic targetOffset topic
+    let positions = startPos : repeat (FilePosition 0)
     let msgsFromStartPos =
           mapM_ (uncurry readLog) (zip (VB.toList logFiles) positions)
     msgsFromStartPos >-> dropMessages remainingMsgs
@@ -208,7 +211,7 @@ dropMessages (RelativeOffset offset) = P.drop (fromIntegral offset)
 -- The resulting messages have `compression = None`, and their offsets are
 -- sequential and dense.
 readLog
-    :: (MonadSafe m) => FilePath -> LogPosition -> Producer MessageEntry m ()
+    :: (MonadSafe m) => FilePath -> FilePosition -> Producer MessageEntry m ()
 readLog path offset =
     decompressStream $ readLogCompressed path offset
 
@@ -217,61 +220,57 @@ readLog path offset =
 -- message indicates the offset of the *last* message stored in its value
 -- field.
 readLogCompressed
-    :: (MonadSafe m) => FilePath -> LogPosition -> Producer MessageEntry m ()
-readLogCompressed path (LogPosition offset) = do
-    let rawData = readFileFromOffset path (fromIntegral offset)
+    :: (MonadSafe m) => FilePath -> FilePosition -> Producer MessageEntry m ()
+readLogCompressed path position = do
+    let rawData = readFileFromPosition path position
     ret <- PAP.parsed parseMessageEntry rawData
     liftIO $ either (throwIO . fst) return ret
 
 -- | Read the given file from the specified byte offset.
-readFileFromOffset
-    :: (MonadSafe m) => FilePath -> Int -> Producer ByteString m ()
-readFileFromOffset path offset =
+readFileFromPosition
+    :: (MonadSafe m) => FilePath -> FilePosition -> Producer ByteString m ()
+readFileFromPosition path (FilePosition position) =
     P.withFile path IO.ReadMode $ \h -> do
-      liftIO $ IO.hSeek h IO.AbsoluteSeek (fromIntegral offset)
+      liftIO $ IO.hSeek h IO.AbsoluteSeek (fromIntegral position)
       PBS.fromHandle h
 
 -------------------------------------------------------------------------------
 -- Reading the index
 
 -- | TODO
-lookupPosition
+lookupPositionInTopic
     :: Offset   -- ^ The target message
     -> Topic    -- ^ The topic
     -> ( VB.Vector FilePath  --- ^ Paths of the relevant log files
-       , LogPosition         --- ^ Starting position within the first file
+       , FilePosition        --- ^ Starting position within the first file
        , RelativeOffset      --- ^ Number of messages to skip after seeking
        )
-lookupPosition targetOffset Topic{..} =
+lookupPositionInTopic targetOffset Topic{..} =
     let relevantSegments =
           dropUntilLast ((<= targetOffset) . initialOffset) segments
-        (position, remainder) = maybe (LogPosition 0, targetOffset .-. Offset 0)
-          (lookupPositionSegment targetOffset) (relevantSegments VB.!? 0)
+        (position, remainder) = maybe (FilePosition 0, targetOffset .-. Offset 0)
+          (lookupPositionInSegment targetOffset) (relevantSegments VB.!? 0)
     in (VB.map logPath relevantSegments, position, remainder)
 
--- | Returns a lower bound on the target message's byte position within
--- a segment's log file. If the offset is negative, return zero. If the
--- offset is greater than the number of messages within the segment, return
--- a position close to the end of the segement.
-lookupPositionSegment :: Offset -> Segment -> (LogPosition, RelativeOffset)
-lookupPositionSegment targetOffset Segment{..} =
-    lookupPositionIndex (targetOffset .-. initialOffset) index
-
--- | Returns the byte position of some message within the
--- corresponding log file, and the offset by which this message precedes
--- the target.
+-- | Returns the byte position of some message within the given segment,
+-- and the offset by which this message precedes the target message.
+--
+-- The returned message is the closest indexed message in the segment which
+-- precedes the target message.
 --
 -- - If the target message is contained in this segment, then
---   this offset will be non-negative and small.
+--   this offset will be non-negative and bounded in size.
 -- - If the target is in an earlier segment, the position will be zero and
---   the offset will be negative.
+--   the offset will be negative and unbounded.
 -- - If the target is in a later segment, the position will be somewhere
---   near the end of the log file and the offset will likely be large.
-lookupPositionIndex :: RelativeOffset -> Index -> (LogPosition, RelativeOffset)
-lookupPositionIndex targetOffset index =
-    fromMaybe (LogPosition 0, targetOffset) $ do
-        entry <- findLastInit ((<= targetOffset) . relativeOffset) index
-        return (logPosition entry, targetOffset ^-^ relativeOffset entry)
+--   near the end of the segment's log file and the offset will be positive
+--   and unbounded.
+lookupPositionInSegment :: Offset -> Segment -> (FilePosition, RelativeOffset)
+lookupPositionInSegment targetOffset Segment{..} =
+    let targetRelOffset = targetOffset .-. initialOffset
+    in fromMaybe (FilePosition 0, targetRelOffset) $ do
+        entry <- findLastInit ((<= targetRelOffset) . relativeOffset) index
+        return (filePosition entry, targetRelOffset ^-^ relativeOffset entry)
 
 
 -------------------------------------------------------------------------------

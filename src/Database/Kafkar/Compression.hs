@@ -50,7 +50,11 @@ decompressMsgWith
     -> MessageEntry                  -- ^ Message wrapping compressed data
     -> Producer MessageEntry m ()    --   Inner messages
 decompressMsgWith decompress =
-    fmap errIfParseFail . parseMessages . decompress . errIfNull . value . message
+    fmap errIfParseFail .  -- raise an exception on parse error
+    parseMessages .        -- parse the result as a stream of messages
+    decompress .           -- decompress it
+    errIfNull .            -- ... which shouldn't be empty
+    value . message        -- extract the payload
   where
     errIfNull =
       fromMaybe (error "decompressMsg: compressed messages cannot be empty")

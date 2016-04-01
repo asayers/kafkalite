@@ -8,6 +8,8 @@
 module Database.Kafkar.Types
     ( -- * Topics
       Topic(..)
+    , TopicName
+    , Partition
     , Segment(..)
 
       -- * Message sets
@@ -24,7 +26,7 @@ module Database.Kafkar.Types
     , Codec(..)
     , Offset(..)
     , RelativeOffset(..)
-    , LogPosition(..)
+    , FilePosition(..)
     , Timestamp(..)
     ) where
 
@@ -53,7 +55,7 @@ newtype RelativeOffset = RelativeOffset Int32
     deriving (Eq, Show, Ord)
 
 -- | The byte-offset of a message within a log file
-newtype LogPosition = LogPosition Int32
+newtype FilePosition = FilePosition Int32
     deriving (Eq, Show, Ord)
 
 -- | The timestamp of a message, in milliseconds since beginning of the epoch
@@ -77,14 +79,14 @@ instance AffineSpace Offset where
 -- segment) to a byte offset within the log file for the segment.
 data IndexEntry = IndexEntry
     { relativeOffset :: {-# UNPACK #-} !RelativeOffset
-    , logPosition    :: {-# UNPACK #-} !LogPosition
+    , filePosition   :: {-# UNPACK #-} !FilePosition
         -- ^ The byte position in the corresponding log file
     } deriving (Eq, Show)
 
 derivingUnbox "IndexEntry"
     [t| IndexEntry -> (Int32,Int32) |]
-    [| \(IndexEntry (RelativeOffset x) (LogPosition y)) -> (x,y) |]
-    [| \(x, y) -> IndexEntry (RelativeOffset x) (LogPosition y) |]
+    [| \(IndexEntry (RelativeOffset x) (FilePosition y)) -> (x,y) |]
+    [| \(x, y) -> IndexEntry (RelativeOffset x) (FilePosition y) |]
 
 -- | An unboxed vector of offset-position relations, which is
 --
@@ -136,9 +138,12 @@ data Attributes = Attributes
 -------------------------------------------------------------------------------
 -- Topics
 
+type TopicName = String
+type Partition = Int
+
 data Topic = Topic
-    { topicName :: !String
-    , partition :: !Int
+    { topicName :: !TopicName
+    , partition :: !Partition
     , segments  :: !(VB.Vector Segment)  -- ^ Segments sorted by initial offset
     } deriving (Eq, Show)
 

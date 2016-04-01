@@ -14,7 +14,7 @@ import Data.Attoparsec.ByteString (Parser)
 import qualified Data.Attoparsec.ByteString.Extras as AP
 import Data.Bits
 import Data.ByteString (ByteString)
-import qualified Data.Vector.Unboxed as V
+import qualified Data.Vector.Unboxed as VU
 
 import Database.Kafkar.Types
 
@@ -93,12 +93,12 @@ parseTimestamp =
 
 parseIndex :: Parser Index
 parseIndex =
-    V.fromList <$> AP.many' parseIndexEntry
+    VU.fromList <$> AP.many' parseIndexEntry
 
 parseIndexEntry :: Parser IndexEntry
 parseIndexEntry = do
     relativeOffset <- RelativeOffset <$> AP.anyInt32be
-    logPosition <- LogPosition <$> AP.anyInt32be
+    filePosition <- FilePosition <$> AP.anyInt32be
     guard $ relativeOffset /= RelativeOffset 0  -- Otherwise we're at the end
     return IndexEntry{..}
 
