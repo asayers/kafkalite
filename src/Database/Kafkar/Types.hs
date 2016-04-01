@@ -69,8 +69,8 @@ instance AffineSpace Offset where
 -- | Relates a logical message offset (given relative to the start of the
 -- segment) to a byte offset within the log file for the segment.
 data IndexEntry = IndexEntry
-    { relativeOffset :: {- UNPACK -} !RelativeOffset
-    , logPosition    :: {- UNPACK -} !LogPosition
+    { relativeOffset :: {-# UNPACK #-} !RelativeOffset
+    , logPosition    :: {-# UNPACK #-} !LogPosition
         -- ^ The byte position in the corresponding log file
     } deriving (Eq, Show)
 
@@ -89,19 +89,19 @@ type Index = VU.Vector IndexEntry
 -- Message sets
 
 data MessageEntry = MessageEntry
-    { offset  :: {- UNPACK -} !Offset
-    , size    :: {- UNPACK -} !Int32
-    , message :: {- UNPACK -} !Message
+    { offset  :: {-# UNPACK #-} !Offset
+    , size    :: {-# UNPACK #-} !Int32
+    , message ::                !Message
     } deriving (Eq, Show)
 
 data Message = Message
-    { attributes :: {- UNPACK -} !Attributes
-    , key        :: {- UNPACK -} !(Maybe ByteString)
-    , value      :: {- UNPACK -} !(Maybe ByteString)
+    { attributes :: {-# UNPACK #-} !Attributes
+    , key        ::                !(Maybe ByteString)
+    , value      ::                !(Maybe ByteString)
     } deriving (Eq, Show)
 
 data Attributes = Attributes
-    { compression :: {- UNPACK -} !Codec
+    { compression :: !Codec
     } deriving (Eq, Show)
 
 -------------------------------------------------------------------------------
