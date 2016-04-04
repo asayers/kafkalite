@@ -3,14 +3,15 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Database.Kafkar.Binary
-    ( getMessageEntry
-    , getIndex
+    ( getMessageEntry, putMessageEntry
+    , getIndex, putIndex
     ) where
 
 import Control.Applicative
 import Control.Monad
 import Data.Binary
 import Data.Binary.Get
+import Data.Binary.Put
 import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -33,11 +34,22 @@ getMessageEntry = do
     message <- getMessage
     return MessageEntry{..}
 
+putMessageEntry :: MessageEntry -> Put
+putMessageEntry MessageEntry{..} = do
+    putOffset offset
+    putInt32be (fromIntegral size)
+    putMessage message
+
 getMessage :: Get Message
 getMessage = msum
     [ MV0 <$> getMessageV0
     , MV1 <$> getMessageV1
     ]
+
+putMessage :: Message -> Put
+putMessage = \case
+    MV0 x -> putMessageV0 x
+    MV1 x -> putMessageV1 x
 
 -- v0
 -- Message => Crc MagicByte Attributes Key Value
@@ -46,6 +58,7 @@ getMessage = msum
 --   Attributes => int8
 --   Key => bytes
 --   Value => bytes
+
 getMessageV0 :: Get MessageV0
 getMessageV0 = do
     _crc <- getInt32be  -- TODO: check crc
@@ -55,6 +68,15 @@ getMessageV0 = do
     mv0Value <- getKafkaBytes   -- TODO: make sure these are being evaluated strictly
     return MessageV0{..}
 
+putMessageV0 :: MessageV0 -> Put
+putMessageV0 MessageV0{..} = do
+    putInt32be undefined -- TODO: compute crc
+    putInt8 0
+    putAttributes mv0Attributes
+    putKafkaBytes mv0Key
+    putKafkaBytes mv0Value
+
+-- v1 (supported since 0.10.0)
 -- Message => Crc MagicByte Attributes Key Value
 --   Crc => int32
 --   MagicByte => int8
@@ -62,6 +84,7 @@ getMessageV0 = do
 --   Timestamp => int64
 --   Key => bytes
 --   Value => bytes
+
 getMessageV1 :: Get MessageV1
 getMessageV1 = do
     _crc <- getInt32be  -- TODO: check crc
@@ -72,9 +95,19 @@ getMessageV1 = do
     mv1Value <- getKafkaBytes   -- TODO: make sure these are being evaluated strictly
     return MessageV1{..}
 
+putMessageV1 :: MessageV1 -> Put
+putMessageV1 MessageV1{..} = do
+    putInt32be undefined -- TODO: compute crc
+    putInt8 1
+    putAttributes mv1Attributes
+    putTimestamp  mv1Timestamp
+    putKafkaBytes mv1Key
+    putKafkaBytes mv1Value
+
 -- This byte holds metadata attributes about the message. The lowest 2 bits
 -- contain the compression codec used for the message. The other bits
 -- should be set to 0.
+
 getAttributes :: Get Attributes
 getAttributes = do
     attrs <- getInt8
@@ -85,11 +118,24 @@ getAttributes = do
         _ -> fail "Unknown codec"
     return Attributes{..}
 
+putAttributes :: Attributes -> Put
+putAttributes Attributes{..} =
+    putInt8 $ case compression of
+        None   -> 0
+        GZip   -> 1
+        Snappy -> 2
+
 getOffset :: Get Offset
 getOffset = Offset <$> getInt64be
 
+putOffset :: Offset -> Put
+putOffset = putInt64be . unOffset
+
 getTimestamp :: Get Timestamp
 getTimestamp = Timestamp <$> getInt64be
+
+putTimestamp :: Timestamp -> Put
+putTimestamp = putInt64be . unTimestamp
 
 -------------------------------------------------------------------------------
 -- Indices
@@ -97,12 +143,20 @@ getTimestamp = Timestamp <$> getInt64be
 getIndex :: Get Index
 getIndex = VU.fromList <$> many getIndexEntry
 
+putIndex :: Index -> Put
+putIndex = VU.mapM_ putIndexEntry
+
 getIndexEntry :: Get IndexEntry
 getIndexEntry = do
     relativeOffset <- RelativeOffset <$> getInt32be
     filePosition <- FilePosition <$> getInt32be
     guard $ relativeOffset /= RelativeOffset 0  -- Otherwise we're at the end
     return IndexEntry{..}
+
+putIndexEntry :: IndexEntry -> Put
+putIndexEntry IndexEntry{..} = do
+    putInt32be $ unRelativeOffset relativeOffset
+    putInt32be $ unFilePosition filePosition
 
 -------------------------------------------------------------------------------
 -- Kafka protocol primitive types
@@ -128,6 +182,13 @@ getKafkaBytes = do
     if len == -1
       then return Nothing
       else Just <$> getByteString (fromIntegral len)
+
+{-# INLINE putKafkaBytes #-}
+putKafkaBytes :: Maybe ByteString -> Put
+putKafkaBytes Nothing = putInt32be (-1)
+putKafkaBytes (Just bs) = do
+    putInt32be (fromIntegral $ BS.length bs)
+    putByteString bs
 
 requireMagicByte :: Int8 -> Get ()
 requireMagicByte magic =
