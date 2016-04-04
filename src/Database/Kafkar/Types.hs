@@ -47,19 +47,19 @@ data Codec = None | GZip | Snappy
     deriving (Eq, Show)
 
 -- | The logical offset of a message within a topic
-newtype Offset = Offset Int64
+newtype Offset = Offset { unOffset :: Int64 }
     deriving (Eq, Show, Ord)
 
 -- | The difference between two logical message offsets
-newtype RelativeOffset = RelativeOffset Int32
+newtype RelativeOffset = RelativeOffset { unRelativeOffset :: Int32 }
     deriving (Eq, Show, Ord)
 
 -- | The byte-offset of a message within a log file
-newtype FilePosition = FilePosition Int32
+newtype FilePosition = FilePosition { unFilePosition :: Int32 }
     deriving (Eq, Show, Ord)
 
 -- | The timestamp of a message, in milliseconds since beginning of the epoch
-newtype Timestamp = Timestamp Int64
+newtype Timestamp = Timestamp { unTimestamp :: Int64 }
     deriving (Eq, Show, Ord)
 
 instance AdditiveGroup RelativeOffset where
@@ -108,11 +108,6 @@ data Message
     | MV1 MessageV1
     deriving (Eq, Show)
 
-attributes :: Message -> Attributes
-timestamp  :: Message -> Maybe Timestamp
-key        :: Message -> Maybe ByteString
-value      :: Message -> Maybe ByteString
-
 data MessageV0 = MessageV0
     { mv0Attributes :: {-# UNPACK #-} !Attributes
     , mv0Key        ::                !(Maybe ByteString)
@@ -125,6 +120,11 @@ data MessageV1 = MessageV1
     , mv1Key        ::                !(Maybe ByteString)
     , mv1Value      ::                !(Maybe ByteString)
     } deriving (Eq, Show)
+
+attributes :: Message -> Attributes
+timestamp  :: Message -> Maybe Timestamp
+key        :: Message -> Maybe ByteString
+value      :: Message -> Maybe ByteString
 
 attributes = \case MV0 x -> mv0Attributes x ; MV1 x -> mv1Attributes x
 timestamp  = \case MV0 _ -> Nothing         ; MV1 x -> Just (mv1Timestamp x)

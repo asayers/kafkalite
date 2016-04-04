@@ -36,22 +36,23 @@ library
       Database.Kafkar
   other-modules:
       Codec.Compression.GZip.Extras
-      Data.Attoparsec.ByteString.Extras
+      Database.Kafkar.Binary
       Database.Kafkar.Compression
-      Database.Kafkar.Parsers
+      Database.Kafkar.Stream
       Database.Kafkar.Types
       Database.Kafkar.Util
   build-depends:
         base >=4.8 && <4.9
-      , attoparsec
-      , attoparsec-binary
+      , binary >= 0.8.1
       , bytestring
       , directory >= 1.2.5
+      , exceptions
       , filepath
       , hashable
       , pipes
-      , pipes-attoparsec
+      , pipes-binary
       , pipes-bytestring
+      , pipes-parse
       , pipes-safe >= 2.2
       , snappy-framed
       , transformers

@@ -17,24 +17,25 @@ module Database.Kafkar.Compression
 
 import qualified Codec.Compression.GZip.Extras as G
 import qualified Codec.Compression.Snappy.Framed as S
+import Control.Monad.Catch
 import Data.ByteString (ByteString)
 import Data.Maybe
 import Pipes
-import qualified Pipes.Attoparsec as PAP
 
-import Database.Kafkar.Parsers
+import Database.Kafkar.Binary
+import Database.Kafkar.Stream
 import Database.Kafkar.Types
 
 
 -- | Every message in the resulting stream will have `compression == None`.
 decompressStream
-    :: (Monad m) => Producer MessageEntry m () -> Producer MessageEntry m ()
+    :: (MonadThrow m) => Producer MessageEntry m () -> Producer MessageEntry m ()
 decompressStream input =
     for input decompressMsg
 
 -- Note that this function is mutually recursive with `decompressStream`.
 decompressMsg
-    :: (Monad m) => MessageEntry -> Producer MessageEntry m ()
+    :: (MonadThrow m) => MessageEntry -> Producer MessageEntry m ()
 decompressMsg entry =
     case compression (attributes $ message entry) of
         None   -> yield entry
@@ -45,20 +46,15 @@ decompressMsg entry =
 -- decompress the value using the provided function, then parse the result
 -- as a sequence of messages and yield them as a Producer.
 decompressMsgWith
-    :: (Monad m)
+    :: (MonadThrow m)
     => (ByteString -> Producer ByteString m ())    -- ^ Decompression function
     -> MessageEntry                  -- ^ Message wrapping compressed data
     -> Producer MessageEntry m ()    --   Inner messages
 decompressMsgWith decompress =
-    fmap errIfParseFail .  -- raise an exception on parse error
-    parseMessages .        -- parse the result as a stream of messages
-    decompress .           -- decompress it
-    errIfNull .            -- ... which shouldn't be empty
-    value . message        -- extract the payload
+    kdecode (getMessageEntry) . -- parse the result as a stream of messages
+    decompress .                -- decompress it
+    errIfNull .                 -- ... which shouldn't be empty
+    value . message             -- extract the payload
   where
     errIfNull =
       fromMaybe (error "decompressMsg: compressed messages cannot be empty")
-    errIfParseFail =
-      either (error "decompressMsg: parse error") id
-    parseMessages =
-      PAP.parsed parseMessageEntry

@@ -115,9 +115,10 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Data.AffineSpace
 import Data.AdditiveGroup
-import qualified Data.Attoparsec.ByteString as AP
+import qualified Data.Binary.Get as B
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BL
 import Data.Function
 import qualified Data.List as L
 import Data.Maybe
@@ -128,15 +129,16 @@ import Pipes hiding (for)
 import Pipes.Safe
 import qualified Pipes.Prelude as P
 import qualified Pipes.Safe.Prelude as P
-import qualified Pipes.Attoparsec as PAP
+import qualified Pipes.Binary as P
 import qualified Pipes.ByteString as PBS
 import System.Directory
 import System.Exit
 import System.FilePath
 import qualified System.IO as IO
 
+import Database.Kafkar.Binary
 import Database.Kafkar.Compression
-import Database.Kafkar.Parsers
+import Database.Kafkar.Stream
 import Database.Kafkar.Types
 import Database.Kafkar.Util
 
@@ -167,11 +169,11 @@ loadTopic logDir topicName partition = do
 
 -- | Load an index file completely into memory and parse it.
 loadIndex :: FilePath -> IO Index
-loadIndex idxPath =
-    either (error err) id . AP.parseOnly parseIndex <$>
-      BS.readFile idxPath
-  where
-    err = "loadIndex: error parsing the index file " ++ idxPath
+loadIndex idxPath = do
+    idxData <- BL.fromStrict <$> BS.readFile idxPath
+    case B.runGetOrFail getIndex idxData of
+      Left  (_rem, offset, err) -> throwIO (P.DecodingError offset err)
+      Right (_rem,_offset, val) -> return val
 
 -- | Stream messages from the given topic, starting at the given offset.
 --
@@ -221,10 +223,8 @@ readLog path offset =
 -- field.
 readLogCompressed
     :: (MonadSafe m) => FilePath -> FilePosition -> Producer MessageEntry m ()
-readLogCompressed path position = do
-    let rawData = readFileFromPosition path position
-    ret <- PAP.parsed parseMessageEntry rawData
-    liftIO $ either (throwIO . fst) return ret
+readLogCompressed path position =
+    kdecode getMessageEntry (readFileFromPosition path position)
 
 -- | Read the given file from the specified byte offset.
 readFileFromPosition
