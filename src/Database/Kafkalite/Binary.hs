@@ -15,6 +15,7 @@ import Data.Binary.Put
 import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import Data.Digest.CRC32
 import Data.Int
 import qualified Data.Vector.Unboxed as VU
 
@@ -69,8 +70,8 @@ getMessageV0 = do
     return MessageV0{..}
 
 putMessageV0 :: MessageV0 -> Put
-putMessageV0 MessageV0{..} = do
-    putInt32be undefined -- TODO: compute crc
+putMessageV0 MessageV0{..} =
+    writingCRC32 $ do
     putInt8 0
     putAttributes mv0Attributes
     putKafkaBytes mv0Key
@@ -96,8 +97,8 @@ getMessageV1 = do
     return MessageV1{..}
 
 putMessageV1 :: MessageV1 -> Put
-putMessageV1 MessageV1{..} = do
-    putInt32be undefined -- TODO: compute crc
+putMessageV1 MessageV1{..} =
+    writingCRC32 $ do
     putInt8 1
     putAttributes mv1Attributes
     putTimestamp  mv1Timestamp
@@ -194,3 +195,19 @@ putKafkaBytes (Just bs) = do
 requireInt8 :: Int8 -> Get ()
 requireInt8 val =
     guard . (== val) =<< getInt8
+
+writingCRC32 :: Put -> Put
+writingCRC32 encoding = do
+    let bs = runPut encoding
+    putWord32be (crc32 bs)
+    putLazyByteString bs
+
+checkingCRC32 :: Get a -> Get a
+checkingCRC32 decoder = do
+    crc <- getWord32be
+    (msg, bs) <- withConsumedBytes decoder
+    guard $ crc == crc32 bs
+    return msg
+
+withConsumedBytes :: Get a -> Get (a, ByteString)
+withConsumedBytes = undefined

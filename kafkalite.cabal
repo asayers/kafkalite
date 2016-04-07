@@ -45,6 +45,7 @@ library
         base >=4.8 && <4.9
       , binary >= 0.8.1
       , bytestring
+      , digest
       , directory >= 1.2.5
       , exceptions
       , filepath
