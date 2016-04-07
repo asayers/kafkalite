@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Database.Kafkar.Binary
+module Database.Kafkalite.Binary
     ( getMessageEntry, putMessageEntry
     , getIndex, putIndex
     ) where
@@ -18,7 +18,7 @@ import qualified Data.ByteString as BS
 import Data.Int
 import qualified Data.Vector.Unboxed as VU
 
-import Database.Kafkar.Types
+import Database.Kafkalite.Types
 
 -- References:
 -- [0]: https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
@@ -62,7 +62,7 @@ putMessage = \case
 getMessageV0 :: Get MessageV0
 getMessageV0 = do
     _crc <- getInt32be  -- TODO: check crc
-    requireMagicByte 0
+    requireInt8 0
     mv0Attributes <- getAttributes
     mv0Key <- getKafkaBytes
     mv0Value <- getKafkaBytes   -- TODO: make sure these are being evaluated strictly
@@ -88,7 +88,7 @@ putMessageV0 MessageV0{..} = do
 getMessageV1 :: Get MessageV1
 getMessageV1 = do
     _crc <- getInt32be  -- TODO: check crc
-    requireMagicByte 1
+    requireInt8 1
     mv1Attributes <- getAttributes
     mv1Timestamp <- getTimestamp
     mv1Key <- getKafkaBytes
@@ -190,6 +190,7 @@ putKafkaBytes (Just bs) = do
     putInt32be (fromIntegral $ BS.length bs)
     putByteString bs
 
-requireMagicByte :: Int8 -> Get ()
-requireMagicByte magic =
-    guard . (== magic) =<< getInt8
+{-# INLINE requireInt8 #-}
+requireInt8 :: Int8 -> Get ()
+requireInt8 val =
+    guard . (== val) =<< getInt8

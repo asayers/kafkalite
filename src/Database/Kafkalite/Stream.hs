@@ -1,5 +1,5 @@
 
-module Database.Kafkar.Stream
+module Database.Kafkalite.Stream
     ( kdecode
     , kencode
     ) where

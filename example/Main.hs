@@ -2,7 +2,7 @@
 
 module Main where
 
-import Database.Kafkar
+import Database.Kafkalite
 import Options.Applicative
 import Pipes
 import Pipes.Safe
@@ -37,7 +37,7 @@ argParser = (<*>) helper $ Args
 
 desc :: InfoMod Args
 desc = fullDesc
-    <> header "kafkar - stream your kafka logs, no broker required!"
+    <> header "kafkalite - stream your kafka logs, no broker required!"
 
 main :: IO ()
 main = do

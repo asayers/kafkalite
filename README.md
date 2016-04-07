@@ -11,4 +11,4 @@ topics to stdout.
 
 See [here] for documentation.
 
-[here]: https://asayers.github.io/kafkar/Database-Kafkar.html
+[here]: https://asayers.github.io/kafkalite/Database-Kafkalite.html

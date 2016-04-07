@@ -5,7 +5,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE LambdaCase #-}
 
-module Database.Kafkar.Types
+module Database.Kafkalite.Types
     ( -- * Topics
       Topic(..)
     , TopicName

@@ -11,7 +11,7 @@
 -- compression codec set. The receiving system parses the actual MessageSet
 -- from the decompressed value. The outer MessageSet should contain only
 -- one compressed "Message" (see KAFKA-1718 for details).
-module Database.Kafkar.Compression
+module Database.Kafkalite.Compression
     ( decompressStream
     ) where
 
@@ -22,9 +22,9 @@ import Data.ByteString (ByteString)
 import Data.Maybe
 import Pipes
 
-import Database.Kafkar.Binary
-import Database.Kafkar.Stream
-import Database.Kafkar.Types
+import Database.Kafkalite.Binary
+import Database.Kafkalite.Stream
+import Database.Kafkalite.Types
 
 
 -- | Every message in the resulting stream will have `compression == None`.

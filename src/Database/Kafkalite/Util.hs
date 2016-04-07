@@ -1,5 +1,5 @@
 
-module Database.Kafkar.Util
+module Database.Kafkalite.Util
     ( dropUntilLast
     , findLastInit
     ) where

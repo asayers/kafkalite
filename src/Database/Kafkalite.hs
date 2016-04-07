@@ -92,7 +92,7 @@
 --   messages in a topic will be absent from the on-disk logs for some
 --   amount of time.
 --
-module Database.Kafkar
+module Database.Kafkalite
     ( -- * Core API
       loadTopic   -- :: FilePath -> TopicName -> Partition -> IO Topic
     , readTopic   -- :: MonadSafe m => Topic -> Offset -> Producer MessageEntry m ()
@@ -136,11 +136,11 @@ import System.Exit
 import System.FilePath
 import qualified System.IO as IO
 
-import Database.Kafkar.Binary
-import Database.Kafkar.Compression
-import Database.Kafkar.Stream
-import Database.Kafkar.Types
-import Database.Kafkar.Util
+import Database.Kafkalite.Binary
+import Database.Kafkalite.Compression
+import Database.Kafkalite.Stream
+import Database.Kafkalite.Types
+import Database.Kafkalite.Util
 
 
 -- | Create a handle for a topic/partition stored on the filesystem.
