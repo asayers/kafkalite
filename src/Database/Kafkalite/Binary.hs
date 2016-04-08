@@ -61,8 +61,8 @@ putMessage = \case
 --   Value => bytes
 
 getMessageV0 :: Get MessageV0
-getMessageV0 = do
-    _crc <- getInt32be  -- TODO: check crc
+getMessageV0 =
+    checkingCRC32 $ do
     requireInt8 0
     mv0Attributes <- getAttributes
     mv0Key <- getKafkaBytes
@@ -87,8 +87,8 @@ putMessageV0 MessageV0{..} =
 --   Value => bytes
 
 getMessageV1 :: Get MessageV1
-getMessageV1 = do
-    _crc <- getInt32be  -- TODO: check crc
+getMessageV1 =
+    checkingCRC32 $ do
     requireInt8 1
     mv1Attributes <- getAttributes
     mv1Timestamp <- getTimestamp
@@ -221,5 +221,16 @@ checkingCRC32 decoder = do
     guard $ crc == crc32 bs
     return msg
 
+-- | Runs the given decoder, returning both its result and the bytes which
+-- it consumed. If the given decoder fails, this function also fails
+-- without consuming anything.
+{-# INLINE withConsumedBytes #-}
 withConsumedBytes :: Get a -> Get (a, ByteString)
-withConsumedBytes = undefined
+withConsumedBytes decoder = do
+    (val, len) <- lookAhead $ do
+      before <- bytesRead
+      val <- decoder
+      after <- bytesRead
+      return (val, after - before)
+    bs <- getByteString (fromIntegral len)
+    return (val, bs)
