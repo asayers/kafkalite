@@ -28,6 +28,24 @@ import Database.Kafkalite.Types
 -------------------------------------------------------------------------------
 -- Message sets
 
+-- One structure common to both the produce and fetch requests is the
+-- message set format. A message in kafka is a key-value pair with a small
+-- amount of associated metadata. A message set is just a sequence of
+-- messages with offset and size information. This format happens to be
+-- used both for the on-disk storage on the broker and the on-the-wire
+-- format.
+--
+-- A message set is also the unit of compression in Kafka, and we allow
+-- messages to recursively contain compressed message sets to allow batch
+-- compression.
+--
+-- N.B., MessageSets are not preceded by an int32 like other array elements
+-- in the protocol.
+
+-- MessageSet => [Offset MessageSize Message]
+--   Offset => int64
+--   MessageSize => int32
+
 getMessageEntry :: Get MessageEntry
 getMessageEntry = do
     offset <- getOffset
@@ -52,7 +70,9 @@ putMessage = \case
     MV0 x -> putMessageV0 x
     MV1 x -> putMessageV1 x
 
--- v0
+-------------------------------------------------------------------------------
+-- Message v0
+
 -- Message => Crc MagicByte Attributes Key Value
 --   Crc => int32
 --   MagicByte => int8
@@ -77,7 +97,9 @@ putMessageV0 MessageV0{..} =
     putKafkaBytes mv0Key
     putKafkaBytes mv0Value
 
--- v1 (supported since 0.10.0)
+-------------------------------------------------------------------------------
+-- Message v1 (supported since 0.10.0)
+
 -- Message => Crc MagicByte Attributes Key Value
 --   Crc => int32
 --   MagicByte => int8
@@ -105,9 +127,65 @@ putMessageV1 MessageV1{..} =
     putKafkaBytes mv1Key
     putKafkaBytes mv1Value
 
--- This byte holds metadata attributes about the message. The lowest 2 bits
--- contain the compression codec used for the message. The other bits
--- should be set to 0.
+-------------------------------------------------------------------------------
+-- Offset
+
+-- This is the offset used in kafka as the log sequence number. When the
+-- producer is sending non compressed messages, it can set the offsets to
+-- anything. When the producer is sending compressed messages, to avoid
+-- server side recompression, each compressed message should have offset
+-- starting from 0 and increasing by one for each inner message in the
+-- compressed message. (see more details about compressed messages in Kafka
+-- below)
+
+getOffset :: Get Offset
+getOffset = Offset <$> getInt64be
+
+putOffset :: Offset -> Put
+putOffset = putInt64be . unOffset
+
+-------------------------------------------------------------------------------
+-- CRC
+
+-- The CRC is the CRC32 of the remainder of the message bytes. This is used
+-- to check the integrity of the message on the broker and consumer.
+
+-- | Write the given bytes prepended by their CRC32 checksum
+writingCRC32 :: Put -> Put
+writingCRC32 encoding = do
+    let bs = runPut encoding
+    putWord32be (crc32 bs)
+    putLazyByteString bs
+
+-- | Run the given decoder, checking that the consumed bytes match
+-- a preceding CRC32 checksum.
+checkingCRC32 :: Get a -> Get a
+checkingCRC32 decoder = do
+    crc <- getWord32be
+    (msg, bs) <- withConsumedBytes decoder
+    guard $ crc == crc32 bs
+    return msg
+
+-------------------------------------------------------------------------------
+-- MagicByte
+
+-- This is a version id used to allow backwards compatible evolution of the
+-- message binary format. The current value is 1.
+
+-- | Fail if the next byte is not the given one.
+{-# INLINE requireInt8 #-}
+requireInt8 :: Int8 -> Get ()
+requireInt8 val =
+    guard . (== val) =<< getInt8
+
+-------------------------------------------------------------------------------
+-- Attributes
+
+-- This byte holds metadata attributes about the message. The lowest 3 bits
+-- contain the compression codec used for the message. The fourth lowest
+-- bit represents the timestamp type. 0 stands for CreateTime and 1 stands
+-- for LogAppendTime. The producer should always set this bit to 0 (since
+-- 0.10.0). All other bits should be set to 0.
 
 getAttributes :: Get Attributes
 getAttributes = do
@@ -138,11 +216,13 @@ putAttributes Attributes{..} = do
         compBits `shift` 0 .&.
         timeBits `shift` 3
 
-getOffset :: Get Offset
-getOffset = Offset <$> getInt64be
 
-putOffset :: Offset -> Put
-putOffset = putInt64be . unOffset
+-------------------------------------------------------------------------------
+-- Timestamp
+
+-- This is the timestamp of the message. The timestamp type is indicated in
+-- the attributes. Unit is milliseconds since beginning of the epoch
+-- (midnight Jan 1, 1970 (UTC)).
 
 getTimestamp :: Get Timestamp
 getTimestamp = Timestamp <$> getInt64be
@@ -174,19 +254,13 @@ putIndexEntry IndexEntry{..} = do
 -------------------------------------------------------------------------------
 -- Kafka protocol primitive types
 
--- The protocol is built out of the following primitive types.
---
--- - Fixed Width Primitives: int8, int16, int32, int64 - Signed integers
---   with the given precision (in bits) stored in big endian order.
--- - Variable Length Primitives: bytes, string - These types consist of
---   a signed integer giving a length N followed by N bytes of content.
---   A length of -1 indicates null. string uses an int16 for its size, and
---   bytes uses an int32.
--- - Arrays: This is a notation for handling repeated structures. These
---   will always be encoded as an int32 size containing the length
---   N followed by N repetitions of the structure which can itself be made
---   up of other primitive types. In the BNF grammars below we will show an
---   array of a structure foo as [foo].
+-- Fixed Width Primitives: int8, int16, int32, int64 - Signed integers
+-- with the given precision (in bits) stored in big endian order.
+
+-- Variable Length Primitives: bytes, string - These types consist of
+-- a signed integer giving a length N followed by N bytes of content.
+-- A length of -1 indicates null. string uses an int16 for its size, and
+-- bytes uses an int32.
 
 {-# INLINE getKafkaBytes #-}
 getKafkaBytes :: Get (Maybe ByteString)
@@ -203,23 +277,8 @@ putKafkaBytes (Just bs) = do
     putInt32be (fromIntegral $ BS.length bs)
     putByteString bs
 
-{-# INLINE requireInt8 #-}
-requireInt8 :: Int8 -> Get ()
-requireInt8 val =
-    guard . (== val) =<< getInt8
-
-writingCRC32 :: Put -> Put
-writingCRC32 encoding = do
-    let bs = runPut encoding
-    putWord32be (crc32 bs)
-    putLazyByteString bs
-
-checkingCRC32 :: Get a -> Get a
-checkingCRC32 decoder = do
-    crc <- getWord32be
-    (msg, bs) <- withConsumedBytes decoder
-    guard $ crc == crc32 bs
-    return msg
+-------------------------------------------------------------------------------
+-- Utilities
 
 -- | Runs the given decoder, returning both its result and the bytes which
 -- it consumed. If the given decoder fails, this function also fails
