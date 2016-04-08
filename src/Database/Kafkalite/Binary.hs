@@ -112,19 +112,31 @@ putMessageV1 MessageV1{..} =
 getAttributes :: Get Attributes
 getAttributes = do
     attrs <- getInt8
-    compression <- case attrs .&. 0x3 of  -- mask all but the lower 2 bits
+    let compBits = (attrs `shift` 0) .&. 0x7  -- lower 3 bits
+    let tsBits   = (attrs `shift` 3) .&. 0x1  -- 4th lowest bit
+    compression <- case compBits of
         0 -> return None
         1 -> return GZip
         2 -> return Snappy
-        _ -> fail "Unknown codec"
+        _ -> fail "Unknown compression codec"
+    timestampType <- case tsBits of
+        0 -> return CreateTime
+        1 -> return LogAppendTime
+        _ -> fail "Unknown timestamp type"
     return Attributes{..}
 
 putAttributes :: Attributes -> Put
-putAttributes Attributes{..} =
-    putInt8 $ case compression of
-        None   -> 0
-        GZip   -> 1
-        Snappy -> 2
+putAttributes Attributes{..} = do
+    let compBits = case compression of
+          None   -> 0
+          GZip   -> 1
+          Snappy -> 2
+    let timeBits = case timestampType of
+          CreateTime    -> 0
+          LogAppendTime -> 1
+    putInt8 $
+        compBits `shift` 0 .&.
+        timeBits `shift` 3
 
 getOffset :: Get Offset
 getOffset = Offset <$> getInt64be

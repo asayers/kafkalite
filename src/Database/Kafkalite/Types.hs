@@ -28,6 +28,7 @@ module Database.Kafkalite.Types
     , RelativeOffset(..)
     , FilePosition(..)
     , Timestamp(..)
+    , TimestampType(..)
     ) where
 
 import Data.AdditiveGroup
@@ -60,6 +61,10 @@ newtype FilePosition = FilePosition { unFilePosition :: Int32 }
 
 -- | The timestamp of a message, in milliseconds since beginning of the epoch
 newtype Timestamp = Timestamp { unTimestamp :: Int64 }
+    deriving (Eq, Show, Ord)
+
+-- | The event which a timestamp records
+data TimestampType = CreateTime | LogAppendTime
     deriving (Eq, Show, Ord)
 
 instance AdditiveGroup RelativeOffset where
@@ -132,7 +137,8 @@ key        = \case MV0 x -> mv0Key x        ; MV1 x -> mv1Key x
 value      = \case MV0 x -> mv0Value x      ; MV1 x -> mv1Value x
 
 data Attributes = Attributes
-    { compression :: !Codec
+    { compression   :: !Codec
+    , timestampType :: !TimestampType
     } deriving (Eq, Show)
 
 -------------------------------------------------------------------------------
