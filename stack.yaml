@@ -2,8 +2,14 @@ flags: {}
 extra-package-dbs: []
 packages:
 - '.'
+- location:
+    git: https://github.com/asayers/snappy-framed.git
+    commit: 6c2c865
+  extra-dep: true
+
 extra-deps:
 - attoparsec-binary-0.2
-- directory-1.2.5.0
-- vector-0.11.0.0
-resolver: lts-3.14
+- binary-0.8.2.1
+- directory-1.2.6.3
+- snappy-0.2.0.2
+resolver: lts-6.3
