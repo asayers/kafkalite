@@ -34,6 +34,8 @@ library
   hs-source-dirs:      src
   exposed-modules:
       Database.Kafkalite
+      Database.Kafkalite.Class
+      Database.Kafkalite.Backend.FileSystem
   other-modules:
       Codec.Compression.GZip.Extras
       Database.Kafkalite.Binary
@@ -50,6 +52,7 @@ library
       , exceptions
       , filepath
       , hashable
+      , mtl
       , pipes
       , pipes-binary
       , pipes-bytestring

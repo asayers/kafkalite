@@ -98,6 +98,7 @@ module Database.Kafkalite
     , readTopic   -- :: MonadSafe m => Topic -> Offset -> Producer MessageEntry m ()
 
       -- * Types
+    , MonadKafka
     , TopicName
     , Partition
     , Offset(..)
@@ -110,14 +111,10 @@ module Database.Kafkalite
     , ppMessage   -- :: MessageEntry -> String
     ) where
 
-import Control.Exception (throwIO)
 import Control.Monad
-import Control.Monad.IO.Class
-import Data.AffineSpace
 import Data.AdditiveGroup
+import Data.AffineSpace
 import qualified Data.Binary.Get as B
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.Function
 import qualified Data.List as L
@@ -126,17 +123,13 @@ import Data.Monoid
 import Data.Traversable
 import qualified Data.Vector as VB
 import Pipes hiding (for)
-import Pipes.Safe
-import qualified Pipes.Prelude as P
-import qualified Pipes.Safe.Prelude as P
 import qualified Pipes.Binary as P
-import qualified Pipes.ByteString as PBS
-import System.Directory
-import System.Exit
+import qualified Pipes.Prelude as P
+import Pipes.Safe
 import System.FilePath
-import qualified System.IO as IO
 
 import Database.Kafkalite.Binary
+import Database.Kafkalite.Class
 import Database.Kafkalite.Compression
 import Database.Kafkalite.Stream
 import Database.Kafkalite.Types
@@ -149,30 +142,30 @@ import Database.Kafkalite.Util
 -- (~100KB per segment). It will not read any log data. The returned value
 -- should not contain any thunks.
 loadTopic
-    :: FilePath  -- ^ Kafka log directory (eg. \/var\/lib\/kafka)
-    -> TopicName   -- ^ Topic name
+    :: (MonadKafka m, MonadThrow m)
+    => TopicName   -- ^ Topic name
     -> Partition   -- ^ Partition number
-    -> IO Topic
-loadTopic logDir topicName partition = do
-    let topicDir = logDir </> topicName ++ "-" ++ show partition
-    listing <- map (topicDir </>) <$> listDirectory topicDir
+    -> m Topic
+loadTopic topicName partition = do
+    let topicDir = topicName ++ "-" ++ show partition
+    listing <- map (topicDir </>) <$> kafkaListDirectory topicDir
     let logs    = L.sort $ filter (".log"   `L.isSuffixOf`) listing
     let indices = L.sort $ filter (".index" `L.isSuffixOf`) listing
     rawSegments <- for (zip logs indices) $ \(logPath, idxPath) -> do
         let logOffset = Offset $ read $ dropExtension $ takeFileName logPath
         let idxOffset = Offset $ read $ dropExtension $ takeFileName idxPath
-        unless (logOffset == idxOffset) exitFailure
+        unless (logOffset == idxOffset) (error "log/index mismatch")
         index <- loadIndex idxPath
         return $! Segment{initialOffset = logOffset, ..}
     let segments = VB.fromList $ L.sortBy (compare `on` initialOffset) rawSegments
     return Topic{..}
 
 -- | Load an index file completely into memory and parse it.
-loadIndex :: FilePath -> IO Index
+loadIndex :: (MonadKafka m, MonadThrow m) => FilePath -> m Index
 loadIndex idxPath = do
-    idxData <- BL.fromStrict <$> BS.readFile idxPath
+    idxData <- BL.fromStrict <$> kafkaReadStrict idxPath
     case B.runGetOrFail getIndex idxData of
-      Left  (_rem, offset, err) -> throwIO (P.DecodingError offset err)
+      Left  (_rem, offset, err) -> throwM (P.DecodingError offset err)
       Right (_rem,_offset, val) -> return val
 
 -- | Stream messages from the given topic, starting at the given offset.
@@ -189,7 +182,7 @@ loadIndex idxPath = do
 -- Kafka logs are stored in multiple segments. This function should only
 -- hold a read handle for one segment file at a time.
 readTopic
-    :: (MonadSafe m)
+    :: (MonadKafka m, MonadThrow m)
     => Topic      -- ^ Topic handle to read from
     -> Offset     -- ^ Offset to begin reading at, given as a number of
                   --   messages since the start of the topic.
@@ -213,7 +206,8 @@ dropMessages (RelativeOffset offset) = P.drop (fromIntegral offset)
 -- The resulting messages have `compression = None`, and their offsets are
 -- sequential and dense.
 readLog
-    :: (MonadSafe m) => FilePath -> FilePosition -> Producer MessageEntry m ()
+    :: (MonadKafka m, MonadThrow m)
+    => FilePath -> FilePosition -> Producer MessageEntry m ()
 readLog path offset =
     decompressStream $ readLogCompressed path offset
 
@@ -222,17 +216,11 @@ readLog path offset =
 -- message indicates the offset of the *last* message stored in its value
 -- field.
 readLogCompressed
-    :: (MonadSafe m) => FilePath -> FilePosition -> Producer MessageEntry m ()
+    :: (MonadKafka m, MonadThrow m)
+    => FilePath -> FilePosition -> Producer MessageEntry m ()
 readLogCompressed path position =
-    kdecode getMessageEntry (readFileFromPosition path position)
+    kdecode getMessageEntry (kafkaReadLazyFromPosition path position)
 
--- | Read the given file from the specified byte offset.
-readFileFromPosition
-    :: (MonadSafe m) => FilePath -> FilePosition -> Producer ByteString m ()
-readFileFromPosition path (FilePosition position) =
-    P.withFile path IO.ReadMode $ \h -> do
-      liftIO $ IO.hSeek h IO.AbsoluteSeek (fromIntegral position)
-      PBS.fromHandle h
 
 -------------------------------------------------------------------------------
 -- Reading the index

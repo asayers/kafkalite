@@ -3,9 +3,9 @@
 module Main where
 
 import Database.Kafkalite
+import Database.Kafkalite.Backend.FileSystem
 import Options.Applicative
 import Pipes
-import Pipes.Safe
 import qualified Pipes.Prelude as P
 
 
@@ -42,12 +42,13 @@ desc = fullDesc
 main :: IO ()
 main = do
     Args{..} <- execParser (info argParser desc)
-    topic <- loadTopic kafkaDir topicName partition
-    runSafeT $ runEffect $
-            readTopic topic (Offset $ fromIntegral offset)
-        >-> maybe cat P.take maxMsgs
-        >-> P.map ppMessage
-        >-> P.stdoutLn
+    topic <- runFileSystemM (loadTopic topicName partition) kafkaDir
+    let pipeline = runEffect $
+                readTopic topic (Offset $ fromIntegral offset)
+            >-> maybe cat P.take maxMsgs
+            >-> P.map ppMessage
+            >-> P.stdoutLn
+    runFileSystemM pipeline kafkaDir
 
 
 
