@@ -1,16 +1,23 @@
 {-# LANGUAGE RecordWildCards #-}
 
--- | Kafka supports compressing messages for additional efficiency, however
--- this is more complex than just compressing a raw message. Because
--- individual messages may not have sufficient redundancy to enable good
--- compression ratios, compressed messages must be sent in special batches
--- (although you may use a batch of one if you truly wish to compress
--- a message on its own). The messages to be sent are wrapped
--- (uncompressed) in a MessageSet structure, which is then compressed and
--- stored in the Value field of a single "Message" with the appropriate
--- compression codec set. The receiving system parses the actual MessageSet
--- from the decompressed value. The outer MessageSet should contain only
--- one compressed "Message" (see KAFKA-1718 for details).
+-- | Kafka supports compressing messages for additional efficiency.
+-- Multiple consecutive messages are compressed as a batch to improve the
+-- compression ratio. (Of course, you may disable this behaviour by using
+-- a batch size of 1.)
+--
+-- The producing client: A batch of uncompressed messages is concatenated
+-- to form a MessageSet, which is then gzipped/snzipped and stored in the
+-- Value field of a single "Message" with the appropriate compression codec
+-- flag set. The offset of this Message should be the offset of the final
+-- compressed message. (Note that this means that the offsets of the
+-- messages in the top-level MessageSet are not dense.)
+--
+-- The server: The Kafka broker simply stores the data it recieves from the
+-- producer.
+--
+-- The consuming client: When a client recieves a message which has a
+-- compresseion flag set, it decompresses the value and parses it as
+-- a MessageSet.
 module Database.Kafkalite.Compression
     ( decompressStream
     ) where
@@ -26,6 +33,21 @@ import Database.Kafkalite.Binary
 import Database.Kafkalite.Stream
 import Database.Kafkalite.Types
 
+-- From the docs:
+--
+-- > Kafka supports compressing messages for additional efficiency, however
+-- > this is more complex than just compressing a raw message. Because
+-- > individual messages may not have sufficient redundancy to enable good
+-- > compression ratios, compressed messages must be sent in special
+-- > batches (although you may use a batch of one if you truly wish to
+-- > compress a message on its own). The messages to be sent are wrapped
+-- > (uncompressed) in a MessageSet structure, which is then compressed and
+-- > stored in the Value field of a single "Message" with the appropriate
+-- > compression codec set. The receiving system parses the actual
+-- > MessageSet from the decompressed value. The outer MessageSet should
+-- > contain only one compressed "Message" (see KAFKA-1718 for details).
+--
+-- https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Compression
 
 -- | Every message in the resulting stream will have `compression == None`.
 decompressStream
