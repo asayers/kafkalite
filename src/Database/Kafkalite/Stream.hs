@@ -13,11 +13,14 @@ import qualified Pipes.Binary as P
 import qualified Pipes.Parse as P
 
 
--- FIXME (asayers): this throws an error on EOF
 -- TODO (asayers): new name
-kdecode :: MonadThrow m => Get a -> Producer ByteString m r -> Producer a m r
+kdecode :: MonadThrow m => Get a -> Producer ByteString m r -> Producer a m ()
 kdecode decoder input = do
-    let handleErr (err, _rem) = lift $ throwM err
+    let handleErr (err, _rem) = case err of
+          P.DecodingError{} -> return ()
+          -- FIXME (asayers): this is too broad, but otherwise it throws an
+          -- error on EOF
+          _ -> lift $ throwM err
     handleErr =<< P.parsed (P.decodeGet decoder) input
 
 -- TODO (asayers): new name
