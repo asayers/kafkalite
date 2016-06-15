@@ -36,6 +36,7 @@ library
       Database.Kafkalite
       Database.Kafkalite.Class
       Database.Kafkalite.Backend.FileSystem
+      Database.Kafkalite.Backend.Tar
   other-modules:
       Codec.Compression.GZip.Extras
       Database.Kafkalite.Binary
@@ -59,6 +60,7 @@ library
       , pipes-parse
       , pipes-safe >= 2.2
       , snappy-framed
+      , tar
       , transformers
       , vector
       , vector-space
