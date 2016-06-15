@@ -16,10 +16,12 @@ import Test.Tasty.Golden
 
 import Database.Kafkalite
 import Database.Kafkalite.Backend.FileSystem
+import Database.Kafkalite.Backend.Tar
 
 main :: IO ()
 main = defaultMain =<< testGroup "kafkalite" <$> sequence
     [ testBackend "filesystem backend" runFileSystemM'
+    , testBackend "tar backend" runTarM'
     ]
 
 testDataDir :: FilePath
@@ -27,6 +29,9 @@ testDataDir = "tests/test-data"
 
 runFileSystemM' :: FileSystemM a -> IO a
 runFileSystemM' x = runFileSystemM x (testDataDir ++ "/fs-data")
+
+runTarM' :: TarM a -> IO a
+runTarM' x = runTarM x (testDataDir ++ "/tar-data.tar")
 
 -------------------------------------------------------------------------------
 -- Testing the filesystem backend
